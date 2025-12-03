@@ -205,6 +205,26 @@ chore: update dependencies
 5. Ensure all tests pass
 6. Submit a pull request
 
+### Pre-Push Verification
+
+Before pushing any changes to the repository, you **MUST** verify that the application builds and runs locally using Docker Desktop. This ensures that the CI/CD pipeline will not fail due to build issues.
+
+1.  **Build Binary Locally:**
+    ```bash
+    go build -o pve-exporter .
+    ```
+
+2.  **Build Docker Image:**
+    ```bash
+    docker build -t pve-exporter:test .
+    ```
+
+3.  **Test Container Startup:**
+    ```bash
+    docker run --rm pve-exporter:test
+    ```
+    *Note: It is expected that the container might exit with an error if no configuration is provided, but it should not fail to start due to missing dependencies or binary format errors.*
+
 ## Release Process
 
 Releases are automated via GitHub Actions:

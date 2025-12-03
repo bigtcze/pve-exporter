@@ -7,9 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strings"
 	"sync"
-	"time"
 
 	"github.com/bigtcze/pve-exporter/config"
 	"github.com/prometheus/client_golang/prometheus"
@@ -35,23 +33,23 @@ type ProxmoxCollector struct {
 	nodeSwapFree    *prometheus.Desc
 
 	// VM/Container metrics
-	vmStatus        *prometheus.Desc
-	vmUptime        *prometheus.Desc
-	vmCPU           *prometheus.Desc
-	vmCPUs          *prometheus.Desc
-	vmMemory        *prometheus.Desc
-	vmMaxMemory     *prometheus.Desc
-	vmDisk          *prometheus.Desc
-	vmMaxDisk       *prometheus.Desc
-	vmNetIn         *prometheus.Desc
-	vmNetOut        *prometheus.Desc
-	vmDiskRead      *prometheus.Desc
-	vmDiskWrite     *prometheus.Desc
+	vmStatus    *prometheus.Desc
+	vmUptime    *prometheus.Desc
+	vmCPU       *prometheus.Desc
+	vmCPUs      *prometheus.Desc
+	vmMemory    *prometheus.Desc
+	vmMaxMemory *prometheus.Desc
+	vmDisk      *prometheus.Desc
+	vmMaxDisk   *prometheus.Desc
+	vmNetIn     *prometheus.Desc
+	vmNetOut    *prometheus.Desc
+	vmDiskRead  *prometheus.Desc
+	vmDiskWrite *prometheus.Desc
 
 	// Storage metrics
-	storageTotal    *prometheus.Desc
-	storageUsed     *prometheus.Desc
-	storageAvail    *prometheus.Desc
+	storageTotal *prometheus.Desc
+	storageUsed  *prometheus.Desc
+	storageAvail *prometheus.Desc
 }
 
 // NewProxmoxCollector creates a new Proxmox collector
@@ -403,18 +401,18 @@ func (c *ProxmoxCollector) collectResourceMetrics(ch chan<- prometheus.Metric, n
 
 	var result struct {
 		Data []struct {
-			VMID    string  `json:"vmid"`
-			Name    string  `json:"name"`
-			Status  string  `json:"status"`
-			Uptime  float64 `json:"uptime"`
-			CPU     float64 `json:"cpu"`
-			CPUs    float64 `json:"cpus"`
-			Mem     float64 `json:"mem"`
-			MaxMem  float64 `json:"maxmem"`
-			Disk    float64 `json:"disk"`
-			MaxDisk float64 `json:"maxdisk"`
-			NetIn   float64 `json:"netin"`
-			NetOut  float64 `json:"netout"`
+			VMID      string  `json:"vmid"`
+			Name      string  `json:"name"`
+			Status    string  `json:"status"`
+			Uptime    float64 `json:"uptime"`
+			CPU       float64 `json:"cpu"`
+			CPUs      float64 `json:"cpus"`
+			Mem       float64 `json:"mem"`
+			MaxMem    float64 `json:"maxmem"`
+			Disk      float64 `json:"disk"`
+			MaxDisk   float64 `json:"maxdisk"`
+			NetIn     float64 `json:"netin"`
+			NetOut    float64 `json:"netout"`
 			DiskRead  float64 `json:"diskread"`
 			DiskWrite float64 `json:"diskwrite"`
 		} `json:"data"`
