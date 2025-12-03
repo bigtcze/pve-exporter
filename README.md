@@ -87,9 +87,12 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_node_up` | Node status (1=online) |
 | `pve_node_uptime_seconds` | Node uptime in seconds |
 | `pve_node_cpu_load` | Node CPU load |
+| `pve_node_cpus_total` | Total number of CPUs |
 | `pve_node_memory_total_bytes` | Total memory in bytes |
 | `pve_node_memory_used_bytes` | Used memory in bytes |
 | `pve_node_memory_free_bytes` | Free memory in bytes |
+| `pve_node_vm_count` | Number of QEMU VMs |
+| `pve_node_lxc_count` | Number of LXC containers |
 
 ### VM Metrics (QEMU)
 
@@ -107,6 +110,7 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_vm_network_out_bytes_total` | Network output bytes |
 | `pve_vm_disk_read_bytes_total` | Disk read bytes |
 | `pve_vm_disk_write_bytes_total` | Disk write bytes |
+| `pve_guest_last_backup_timestamp_seconds` | Timestamp of the last backup |
 
 ### LXC Metrics (Containers)
 
@@ -124,6 +128,7 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_lxc_network_out_bytes_total` | Network output bytes |
 | `pve_lxc_disk_read_bytes_total` | Disk read bytes |
 | `pve_lxc_disk_write_bytes_total` | Disk write bytes |
+| `pve_guest_last_backup_timestamp_seconds` | Timestamp of the last backup |
 
 ### Storage Metrics
 

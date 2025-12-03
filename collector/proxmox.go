@@ -25,12 +25,15 @@ type ProxmoxCollector struct {
 	nodeUp          *prometheus.Desc
 	nodeUptime      *prometheus.Desc
 	nodeCPULoad     *prometheus.Desc
+	nodeCPUs        *prometheus.Desc // New
 	nodeMemoryTotal *prometheus.Desc
 	nodeMemoryUsed  *prometheus.Desc
 	nodeMemoryFree  *prometheus.Desc
 	nodeSwapTotal   *prometheus.Desc
 	nodeSwapUsed    *prometheus.Desc
 	nodeSwapFree    *prometheus.Desc
+	nodeVMCount     *prometheus.Desc // New
+	nodeLXCCount    *prometheus.Desc // New
 
 	// VM metrics
 	vmStatus    *prometheus.Desc
@@ -64,6 +67,9 @@ type ProxmoxCollector struct {
 	storageTotal *prometheus.Desc
 	storageUsed  *prometheus.Desc
 	storageAvail *prometheus.Desc
+
+	// Backup metrics
+	guestLastBackup *prometheus.Desc // New
 }
 
 // NewProxmoxCollector creates a new Proxmox collector
@@ -97,6 +103,11 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 			"Node CPU load",
 			[]string{"node"}, nil,
 		),
+		nodeCPUs: prometheus.NewDesc(
+			"pve_node_cpus_total",
+			"Total number of CPUs",
+			[]string{"node"}, nil,
+		),
 		nodeMemoryTotal: prometheus.NewDesc(
 			"pve_node_memory_total_bytes",
 			"Total memory in bytes",
@@ -125,6 +136,16 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 		nodeSwapFree: prometheus.NewDesc(
 			"pve_node_swap_free_bytes",
 			"Free swap in bytes",
+			[]string{"node"}, nil,
+		),
+		nodeVMCount: prometheus.NewDesc(
+			"pve_node_vm_count",
+			"Number of QEMU VMs",
+			[]string{"node"}, nil,
+		),
+		nodeLXCCount: prometheus.NewDesc(
+			"pve_node_lxc_count",
+			"Number of LXC containers",
 			[]string{"node"}, nil,
 		),
 
@@ -268,6 +289,13 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 			"Available storage in bytes",
 			[]string{"node", "storage", "type"}, nil,
 		),
+
+		// Backup metrics
+		guestLastBackup: prometheus.NewDesc(
+			"pve_guest_last_backup_timestamp_seconds",
+			"Timestamp of the last backup",
+			[]string{"node", "vmid"}, nil,
+		),
 	}
 }
 
@@ -276,12 +304,15 @@ func (c *ProxmoxCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.nodeUp
 	ch <- c.nodeUptime
 	ch <- c.nodeCPULoad
+	ch <- c.nodeCPUs
 	ch <- c.nodeMemoryTotal
 	ch <- c.nodeMemoryUsed
 	ch <- c.nodeMemoryFree
 	ch <- c.nodeSwapTotal
 	ch <- c.nodeSwapUsed
 	ch <- c.nodeSwapFree
+	ch <- c.nodeVMCount
+	ch <- c.nodeLXCCount
 	ch <- c.vmStatus
 	ch <- c.vmUptime
 	ch <- c.vmCPU
@@ -309,6 +340,7 @@ func (c *ProxmoxCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.storageTotal
 	ch <- c.storageUsed
 	ch <- c.storageAvail
+	ch <- c.guestLastBackup
 }
 
 // Collect implements prometheus.Collector
@@ -326,6 +358,9 @@ func (c *ProxmoxCollector) Collect(ch chan<- prometheus.Metric) {
 
 	// Collect storage metrics
 	c.collectStorageMetrics(ch)
+
+	// Collect backup metrics
+	c.collectBackupMetrics(ch)
 }
 
 // authenticate authenticates with Proxmox API
@@ -417,6 +452,7 @@ func (c *ProxmoxCollector) collectNodeMetrics(ch chan<- prometheus.Metric) {
 			Status  string  `json:"status"`
 			Uptime  float64 `json:"uptime"`
 			CPU     float64 `json:"cpu"`
+			CPUs    float64 `json:"cpus"` // New field
 			MaxCPU  float64 `json:"maxcpu"`
 			Mem     float64 `json:"mem"`
 			MaxMem  float64 `json:"maxmem"`
@@ -438,6 +474,7 @@ func (c *ProxmoxCollector) collectNodeMetrics(ch chan<- prometheus.Metric) {
 		ch <- prometheus.MustNewConstMetric(c.nodeUp, prometheus.GaugeValue, up, node.Node)
 		ch <- prometheus.MustNewConstMetric(c.nodeUptime, prometheus.GaugeValue, node.Uptime, node.Node)
 		ch <- prometheus.MustNewConstMetric(c.nodeCPULoad, prometheus.GaugeValue, node.CPU, node.Node)
+		ch <- prometheus.MustNewConstMetric(c.nodeCPUs, prometheus.GaugeValue, node.CPUs, node.Node)
 		ch <- prometheus.MustNewConstMetric(c.nodeMemoryTotal, prometheus.GaugeValue, node.MaxMem, node.Node)
 		ch <- prometheus.MustNewConstMetric(c.nodeMemoryUsed, prometheus.GaugeValue, node.Mem, node.Node)
 		ch <- prometheus.MustNewConstMetric(c.nodeMemoryFree, prometheus.GaugeValue, node.MaxMem-node.Mem, node.Node)
@@ -469,18 +506,21 @@ func (c *ProxmoxCollector) collectVMMetrics(ch chan<- prometheus.Metric) {
 	// Collect VMs and containers for each node
 	for _, node := range nodesResult.Data {
 		// QEMU VMs
-		c.collectResourceMetrics(ch, node.Node, "qemu")
+		vmCount := c.collectResourceMetrics(ch, node.Node, "qemu")
+		ch <- prometheus.MustNewConstMetric(c.nodeVMCount, prometheus.GaugeValue, float64(vmCount), node.Node)
+
 		// LXC containers
-		c.collectResourceMetrics(ch, node.Node, "lxc")
+		lxcCount := c.collectResourceMetrics(ch, node.Node, "lxc")
+		ch <- prometheus.MustNewConstMetric(c.nodeLXCCount, prometheus.GaugeValue, float64(lxcCount), node.Node)
 	}
 }
 
-// collectResourceMetrics collects metrics for VMs or containers
-func (c *ProxmoxCollector) collectResourceMetrics(ch chan<- prometheus.Metric, node, resType string) {
+// collectResourceMetrics collects metrics for VMs or containers and returns the count
+func (c *ProxmoxCollector) collectResourceMetrics(ch chan<- prometheus.Metric, node, resType string) int {
 	path := fmt.Sprintf("/nodes/%s/%s", node, resType)
 	data, err := c.apiRequest(path)
 	if err != nil {
-		return
+		return 0
 	}
 
 	var result struct {
@@ -503,7 +543,7 @@ func (c *ProxmoxCollector) collectResourceMetrics(ch chan<- prometheus.Metric, n
 	}
 
 	if err := json.Unmarshal(data, &result); err != nil {
-		return
+		return 0
 	}
 
 	for _, vm := range result.Data {
@@ -542,6 +582,8 @@ func (c *ProxmoxCollector) collectResourceMetrics(ch chan<- prometheus.Metric, n
 			ch <- prometheus.MustNewConstMetric(c.vmDiskWrite, prometheus.CounterValue, vm.DiskWrite, labels...)
 		}
 	}
+
+	return len(result.Data)
 }
 
 // collectStorageMetrics collects storage metrics
@@ -588,6 +630,101 @@ func (c *ProxmoxCollector) collectStorageMetrics(ch chan<- prometheus.Metric) {
 			ch <- prometheus.MustNewConstMetric(c.storageTotal, prometheus.GaugeValue, storage.Total, labels...)
 			ch <- prometheus.MustNewConstMetric(c.storageUsed, prometheus.GaugeValue, storage.Used, labels...)
 			ch <- prometheus.MustNewConstMetric(c.storageAvail, prometheus.GaugeValue, storage.Avail, labels...)
+		}
+	}
+}
+
+// collectBackupMetrics collects backup timestamp metrics
+func (c *ProxmoxCollector) collectBackupMetrics(ch chan<- prometheus.Metric) {
+	// Get list of nodes
+	nodesData, err := c.apiRequest("/nodes")
+	if err != nil {
+		return
+	}
+
+	var nodesResult struct {
+		Data []struct {
+			Node string `json:"node"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(nodesData, &nodesResult); err != nil {
+		return
+	}
+
+	for _, node := range nodesResult.Data {
+		// Get list of storages for the node
+		storagePath := fmt.Sprintf("/nodes/%s/storage", node.Node)
+		storageData, err := c.apiRequest(storagePath)
+		if err != nil {
+			continue
+		}
+
+		var storageResult struct {
+			Data []struct {
+				Storage string `json:"storage"`
+				Content string `json:"content"` // e.g. "backup,iso"
+			} `json:"data"`
+		}
+
+		if err := json.Unmarshal(storageData, &storageResult); err != nil {
+			continue
+		}
+
+		for _, storage := range storageResult.Data {
+			// Check if storage supports backups
+			// Note: We could check 'content' field but querying content=backup is safer/easier
+
+			contentPath := fmt.Sprintf("/nodes/%s/storage/%s/content?content=backup", node.Node, storage.Storage)
+			contentData, err := c.apiRequest(contentPath)
+			if err != nil {
+				continue
+			}
+
+			var contentResult struct {
+				Data []struct {
+					VolID string      `json:"volid"`
+					VMID  interface{} `json:"vmid"` // Can be string or int
+					CTime int64       `json:"ctime"`
+				} `json:"data"`
+			}
+
+			if err := json.Unmarshal(contentData, &contentResult); err != nil {
+				continue
+			}
+
+			// Track latest backup per VM
+			lastBackups := make(map[string]int64)
+
+			for _, item := range contentResult.Data {
+				// Parse VMID
+				var vmid string
+				switch v := item.VMID.(type) {
+				case float64:
+					vmid = fmt.Sprintf("%.0f", v)
+				case string:
+					vmid = v
+				default:
+					// Try to extract from volid if vmid field is missing/invalid
+					// Format: storage:backup/vzdump-qemu-100-2023...
+					// This is complex, skipping for now if vmid is missing
+					continue
+				}
+
+				if item.CTime > lastBackups[vmid] {
+					lastBackups[vmid] = item.CTime
+				}
+			}
+
+			for vmid, timestamp := range lastBackups {
+				ch <- prometheus.MustNewConstMetric(
+					c.guestLastBackup,
+					prometheus.GaugeValue,
+					float64(timestamp),
+					node.Node,
+					vmid,
+				)
+			}
 		}
 	}
 }
