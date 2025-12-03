@@ -1,3 +1,50 @@
+# Proxmox VE Exporter
+
+[![Go Report Card](https://goreportcard.com/badge/github.com/bigtcze/pve-exporter)](https://goreportcard.com/report/github.com/bigtcze/pve-exporter)
+[![GitHub release](https://img.shields.io/github/release/bigtcze/pve-exporter.svg)](https://github.com/bigtcze/pve-exporter/releases)
+[![License](https://img.shields.io/github/license/bigtcze/pve-exporter.svg)](LICENSE)
+
+A professional Prometheus exporter for Proxmox VE, written in Go. It collects comprehensive metrics from your Proxmox nodes, virtual machines (QEMU), LXC containers, and storage, exposing them for monitoring and alerting.
+
+## 🚀 Features
+
+- **Comprehensive Metrics**:
+  - **Node**: CPU, Memory, Uptime, Status.
+  - **VM (QEMU)**: CPU, Memory, Disk, Network I/O, Uptime, Status.
+  - **LXC Containers**: CPU, Memory, Disk, Network I/O, Uptime, Status.
+  - **Storage**: Usage, Availability, Total size.
+- **Secure**: Supports API Token authentication (recommended) and standard password auth.
+- **Lightweight**: Built as a single binary or minimal Docker container.
+- **Easy Configuration**: Configure via environment variables or YAML file.
+
+## ⚡ Quick Start
+
+### Docker
+
+```bash
+docker run -d \
+  -p 9221:9221 \
+  -e PVE_USER="root@pam" \
+  -e PVE_PASSWORD="your-password" \
+  -e PVE_HOST="proxmox.example.com" \
+  --name pve-exporter \
+  ghcr.io/bigtcze/pve-exporter:latest
+```
+
+### Binary
+
+```bash
+# Download latest release
+wget https://github.com/bigtcze/pve-exporter/releases/latest/download/pve-exporter_linux_amd64
+chmod +x pve-exporter_linux_amd64
+
+# Run
+./pve-exporter_linux_amd64 -config config.yml
+```
+
+## ⚙️ Configuration
+
+You can configure the exporter using a `config.yml` file or environment variables.
 
 ### Environment Variables
 
@@ -12,42 +59,26 @@
 | `LISTEN_ADDRESS` | HTTP server listen address | `:9221` |
 | `METRICS_PATH` | Metrics endpoint path | `/metrics` |
 
-### Configuration File
-
-Create a `config.yml` file:
+### Configuration File (`config.yml`)
 
 ```yaml
 proxmox:
   host: "proxmox.example.com"
   port: 8006
   user: "root@pam"
-  password: "your-password"
+  # Recommended: Use API Token instead of password
+  token_id: "monitoring@pve!exporter"
+  token_secret: "your-token-secret"
   insecure_skip_verify: true
 
 server:
   listen_address: ":9221"
   metrics_path: "/metrics"
-
-
 ```
 
-Run with: `./pve-exporter -config config.yml`
+## 📊 Metrics
 
-## Prometheus Configuration
-
-Add to your `prometheus.yml`:
-
-```yaml
-scrape_configs:
-  - job_name: 'proxmox'
-    static_configs:
-      - targets: ['localhost:9221']
-    scrape_interval: 30s
-```
-
-## Metrics
-
-The exporter exposes the following metrics:
+The exporter exposes the following metrics at `/metrics`.
 
 ### Node Metrics
 
@@ -102,124 +133,32 @@ The exporter exposes the following metrics:
 | `pve_storage_used_bytes` | Used storage in bytes |
 | `pve_storage_available_bytes` | Available storage in bytes |
 
-## Authentication
+## 🔒 Authentication & Permissions
 
-### Password Authentication
+For security best practices, create a dedicated monitoring user with **read-only** permissions.
 
-```bash
-PVE_USER=root@pam
-PVE_PASSWORD=your-password
-```
+1. **Create User**: `monitoring@pve`
+2. **Assign Role**: `PVEAuditor` (provides read-only access to Nodes, VMs, Storage)
+3. **Create API Token**: `monitoring@pve!exporter` (uncheck "Privilege Separation")
 
-### API Token Authentication (Recommended)
-
-1. Create an API token in Proxmox:
-   - Datacenter → Permissions → API Tokens
-   - Create a new token with appropriate permissions
-
-2. Use token credentials:
-```bash
-PVE_TOKEN_ID=user@realm!tokenid
-PVE_TOKEN_SECRET=your-token-secret
-```
-
-## Required Proxmox Permissions
-
-For security best practices, create a dedicated monitoring user with **read-only** permissions instead of using the root account.
-
-### Creating a Monitoring User
-
-1. **Create a new user** in Proxmox:
-   - Navigate to: Datacenter → Permissions → Users
-   - Click "Add" and create user (e.g., `monitoring@pve`)
-
-2. **Assign read-only permissions**:
-   - Navigate to: Datacenter → Permissions
-   - Click "Add" → "User Permission"
-   - Path: `/`
-   - User: `monitoring@pve`
-   - Role: `PVEAuditor`
-
-3. **Optional: Create API Token** (recommended over password):
-   - Navigate to: Datacenter → Permissions → API Tokens
-   - Select your monitoring user
-   - Click "Add" and create token (e.g., `monitoring@pve!exporter`)
-   - **Important**: Uncheck "Privilege Separation" to inherit user permissions
-   - Save the token secret securely (shown only once)
-
-### Required Permissions
-
-The exporter requires the following **read-only** permissions:
-
-- **PVEAuditor role** provides:
-  - `Sys.Audit` - Read system information (nodes, VMs, containers)
-  - `Datastore.Audit` - Read storage information
-  - Access to API endpoints for metrics collection
-
-These permissions allow the exporter to:
-- ✅ Read node status and metrics
-- ✅ Read VM/container status and metrics
-- ✅ Read storage information
-- ❌ Cannot modify any resources
-- ❌ Cannot start/stop VMs or containers
-- ❌ Cannot change configurations
-
-## Building from Source
+## 🛠️ Development
 
 ```bash
-# Clone the repository
+# Clone
 git clone https://github.com/bigtcze/pve-exporter.git
 cd pve-exporter
 
-# Build binary
+# Build
 go build -o pve-exporter .
 
-# Build Docker image
-docker build -t pve-exporter .
-```
-
-## Development
-
-```bash
-# Install dependencies
-go mod download
-
-# Run tests
+# Test
 go test ./...
-
-# Run locally
-go run . -config config.example.yml
 ```
 
-## Grafana Dashboard
+## 🤝 Contributing
 
-Example queries for Grafana:
+Contributions are welcome! Please submit a Pull Request.
 
-**Node CPU Load**:
-```promql
-pve_node_cpu_load{node="proxmox"}
-```
+## 📄 License
 
-**VM Memory Usage**:
-```promql
-pve_vm_memory_used_bytes / pve_vm_memory_max_bytes * 100
-```
-
-
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Inspired by the Proxmox InfluxDB integration
-- Built with [Prometheus Go client](https://github.com/prometheus/client_golang)
-
-## Support
-
-For issues and questions, please use the [GitHub issue tracker](https://github.com/bigtcze/pve-exporter/issues).
+MIT License - see [LICENSE](LICENSE) for details.
