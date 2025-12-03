@@ -1,0 +1,192 @@
+# HELP pve_storage_available_bytes Available storage in bytes
+# TYPE pve_storage_available_bytes gauge
+pve_storage_available_bytes{node="pve2",storage="PBS2",type="pbs"} 4.364769132544e+12
+pve_storage_available_bytes{node="pve2",storage="hdd_raidz1",type="zfspool"} 6.33077173312e+12
+pve_storage_available_bytes{node="pve2",storage="hdd_raidz1_iso",type="dir"} 6.33077170176e+12
+pve_storage_available_bytes{node="pve2",storage="local",type="dir"} 0
+pve_storage_available_bytes{node="pve2",storage="local-zfs",type="zfspool"} 7.60833048576e+11
+pve_storage_available_bytes{node="pve2",storage="pbs_datastore",type="dir"} 4.364769132544e+12
+# HELP pve_storage_total_bytes Total storage size in bytes
+# TYPE pve_storage_total_bytes gauge
+pve_storage_total_bytes{node="pve2",storage="PBS2",type="pbs"} 5.952693100544e+12
+pve_storage_total_bytes{node="pve2",storage="hdd_raidz1",type="zfspool"} 1.1483534589952e+13
+pve_storage_total_bytes{node="pve2",storage="hdd_raidz1_iso",type="dir"} 6.342742900736e+12
+pve_storage_total_bytes{node="pve2",storage="local",type="dir"} 0
+pve_storage_total_bytes{node="pve2",storage="local-zfs",type="zfspool"} 9.59172980736e+11
+pve_storage_total_bytes{node="pve2",storage="pbs_datastore",type="dir"} 5.952693100544e+12
+# HELP pve_storage_used_bytes Used storage in bytes
+# TYPE pve_storage_used_bytes gauge
+pve_storage_used_bytes{node="pve2",storage="PBS2",type="pbs"} 1.287848517632e+12
+pve_storage_used_bytes{node="pve2",storage="hdd_raidz1",type="zfspool"} 5.152762856832e+12
+pve_storage_used_bytes{node="pve2",storage="hdd_raidz1_iso",type="dir"} 1.1971198976e+10
+pve_storage_used_bytes{node="pve2",storage="local",type="dir"} 0
+pve_storage_used_bytes{node="pve2",storage="local-zfs",type="zfspool"} 1.9833993216e+11
+pve_storage_used_bytes{node="pve2",storage="pbs_datastore",type="dir"} 1.287848517632e+12
+# HELP pve_vm_cpu_usage VM/Container CPU usage
+# TYPE pve_vm_cpu_usage gauge
+pve_vm_cpu_usage{name="apps",node="pve2",type="qemu",vmid="150"} 0.0285072512445204
+pve_vm_cpu_usage{name="backupondra",node="pve2",type="lxc",vmid="103"} 0.001641392409937
+pve_vm_cpu_usage{name="build-vm",node="pve2",type="qemu",vmid="100"} 0
+pve_vm_cpu_usage{name="dmz",node="pve2",type="qemu",vmid="154"} 0.0310475013554183
+pve_vm_cpu_usage{name="media",node="pve2",type="qemu",vmid="151"} 0.0128098082515362
+pve_vm_cpu_usage{name="nas",node="pve2",type="qemu",vmid="152"} 0.0108412953450855
+pve_vm_cpu_usage{name="opn",node="pve2",type="qemu",vmid="102"} 0.0282250012321984
+pve_vm_cpu_usage{name="stream",node="pve2",type="lxc",vmid="120"} 0.000477653875907593
+pve_vm_cpu_usage{name="template-lxc-docker",node="pve2",type="lxc",vmid="998"} 0
+pve_vm_cpu_usage{name="template-lxc-unpriv",node="pve2",type="lxc",vmid="999"} 0
+pve_vm_cpu_usage{name="template-vm",node="pve2",type="qemu",vmid="1000"} 0
+pve_vm_cpu_usage{name="users",node="pve2",type="qemu",vmid="153"} 0.00586211564053352
+# HELP pve_vm_cpus Number of CPUs allocated to VM/Container
+# TYPE pve_vm_cpus gauge
+pve_vm_cpus{name="apps",node="pve2",type="qemu",vmid="150"} 4
+pve_vm_cpus{name="backupondra",node="pve2",type="lxc",vmid="103"} 2
+pve_vm_cpus{name="build-vm",node="pve2",type="qemu",vmid="100"} 6
+pve_vm_cpus{name="dmz",node="pve2",type="qemu",vmid="154"} 2
+pve_vm_cpus{name="media",node="pve2",type="qemu",vmid="151"} 2
+pve_vm_cpus{name="nas",node="pve2",type="qemu",vmid="152"} 6
+pve_vm_cpus{name="opn",node="pve2",type="qemu",vmid="102"} 4
+pve_vm_cpus{name="stream",node="pve2",type="lxc",vmid="120"} 4
+pve_vm_cpus{name="template-lxc-docker",node="pve2",type="lxc",vmid="998"} 1
+pve_vm_cpus{name="template-lxc-unpriv",node="pve2",type="lxc",vmid="999"} 1
+pve_vm_cpus{name="template-vm",node="pve2",type="qemu",vmid="1000"} 2
+pve_vm_cpus{name="users",node="pve2",type="qemu",vmid="153"} 2
+# HELP pve_vm_disk_max_bytes VM/Container maximum disk in bytes
+# TYPE pve_vm_disk_max_bytes gauge
+pve_vm_disk_max_bytes{name="apps",node="pve2",type="qemu",vmid="150"} 1.610612736e+11
+pve_vm_disk_max_bytes{name="backupondra",node="pve2",type="lxc",vmid="103"} 1.073741824e+10
+pve_vm_disk_max_bytes{name="build-vm",node="pve2",type="qemu",vmid="100"} 1.073741824e+11
+pve_vm_disk_max_bytes{name="dmz",node="pve2",type="qemu",vmid="154"} 5.36870912e+10
+pve_vm_disk_max_bytes{name="media",node="pve2",type="qemu",vmid="151"} 5.36870912e+10
+pve_vm_disk_max_bytes{name="nas",node="pve2",type="qemu",vmid="152"} 4.294967296e+11
+pve_vm_disk_max_bytes{name="opn",node="pve2",type="qemu",vmid="102"} 0
+pve_vm_disk_max_bytes{name="stream",node="pve2",type="lxc",vmid="120"} 1.073741824e+11
+pve_vm_disk_max_bytes{name="template-lxc-docker",node="pve2",type="lxc",vmid="998"} 1.073741824e+10
+pve_vm_disk_max_bytes{name="template-lxc-unpriv",node="pve2",type="lxc",vmid="999"} 1.073741824e+10
+pve_vm_disk_max_bytes{name="template-vm",node="pve2",type="qemu",vmid="1000"} 5.36870912e+10
+pve_vm_disk_max_bytes{name="users",node="pve2",type="qemu",vmid="153"} 5.36870912e+10
+# HELP pve_vm_disk_read_bytes_total VM/Container disk read in bytes
+# TYPE pve_vm_disk_read_bytes_total counter
+pve_vm_disk_read_bytes_total{name="apps",node="pve2",type="qemu",vmid="150"} 0
+pve_vm_disk_read_bytes_total{name="backupondra",node="pve2",type="lxc",vmid="103"} 9.613312e+07
+pve_vm_disk_read_bytes_total{name="build-vm",node="pve2",type="qemu",vmid="100"} 0
+pve_vm_disk_read_bytes_total{name="dmz",node="pve2",type="qemu",vmid="154"} 0
+pve_vm_disk_read_bytes_total{name="media",node="pve2",type="qemu",vmid="151"} 0
+pve_vm_disk_read_bytes_total{name="nas",node="pve2",type="qemu",vmid="152"} 0
+pve_vm_disk_read_bytes_total{name="opn",node="pve2",type="qemu",vmid="102"} 0
+pve_vm_disk_read_bytes_total{name="stream",node="pve2",type="lxc",vmid="120"} 2.20901376e+08
+pve_vm_disk_read_bytes_total{name="template-lxc-docker",node="pve2",type="lxc",vmid="998"} 0
+pve_vm_disk_read_bytes_total{name="template-lxc-unpriv",node="pve2",type="lxc",vmid="999"} 0
+pve_vm_disk_read_bytes_total{name="template-vm",node="pve2",type="qemu",vmid="1000"} 0
+pve_vm_disk_read_bytes_total{name="users",node="pve2",type="qemu",vmid="153"} 0
+# HELP pve_vm_disk_used_bytes VM/Container disk usage in bytes
+# TYPE pve_vm_disk_used_bytes gauge
+pve_vm_disk_used_bytes{name="apps",node="pve2",type="qemu",vmid="150"} 0
+pve_vm_disk_used_bytes{name="backupondra",node="pve2",type="lxc",vmid="103"} 8.1723392e+08
+pve_vm_disk_used_bytes{name="build-vm",node="pve2",type="qemu",vmid="100"} 0
+pve_vm_disk_used_bytes{name="dmz",node="pve2",type="qemu",vmid="154"} 0
+pve_vm_disk_used_bytes{name="media",node="pve2",type="qemu",vmid="151"} 0
+pve_vm_disk_used_bytes{name="nas",node="pve2",type="qemu",vmid="152"} 0
+pve_vm_disk_used_bytes{name="opn",node="pve2",type="qemu",vmid="102"} 0
+pve_vm_disk_used_bytes{name="stream",node="pve2",type="lxc",vmid="120"} 4.33127424e+09
+pve_vm_disk_used_bytes{name="template-lxc-docker",node="pve2",type="lxc",vmid="998"} 0
+pve_vm_disk_used_bytes{name="template-lxc-unpriv",node="pve2",type="lxc",vmid="999"} 0
+pve_vm_disk_used_bytes{name="template-vm",node="pve2",type="qemu",vmid="1000"} 0
+pve_vm_disk_used_bytes{name="users",node="pve2",type="qemu",vmid="153"} 0
+# HELP pve_vm_disk_write_bytes_total VM/Container disk write in bytes
+# TYPE pve_vm_disk_write_bytes_total counter
+pve_vm_disk_write_bytes_total{name="apps",node="pve2",type="qemu",vmid="150"} 0
+pve_vm_disk_write_bytes_total{name="backupondra",node="pve2",type="lxc",vmid="103"} 0
+pve_vm_disk_write_bytes_total{name="build-vm",node="pve2",type="qemu",vmid="100"} 0
+pve_vm_disk_write_bytes_total{name="dmz",node="pve2",type="qemu",vmid="154"} 0
+pve_vm_disk_write_bytes_total{name="media",node="pve2",type="qemu",vmid="151"} 0
+pve_vm_disk_write_bytes_total{name="nas",node="pve2",type="qemu",vmid="152"} 0
+pve_vm_disk_write_bytes_total{name="opn",node="pve2",type="qemu",vmid="102"} 0
+pve_vm_disk_write_bytes_total{name="stream",node="pve2",type="lxc",vmid="120"} 6.897664e+06
+pve_vm_disk_write_bytes_total{name="template-lxc-docker",node="pve2",type="lxc",vmid="998"} 0
+pve_vm_disk_write_bytes_total{name="template-lxc-unpriv",node="pve2",type="lxc",vmid="999"} 0
+pve_vm_disk_write_bytes_total{name="template-vm",node="pve2",type="qemu",vmid="1000"} 0
+pve_vm_disk_write_bytes_total{name="users",node="pve2",type="qemu",vmid="153"} 0
+# HELP pve_vm_memory_max_bytes VM/Container maximum memory in bytes
+# TYPE pve_vm_memory_max_bytes gauge
+pve_vm_memory_max_bytes{name="apps",node="pve2",type="qemu",vmid="150"} 4.294967296e+09
+pve_vm_memory_max_bytes{name="backupondra",node="pve2",type="lxc",vmid="103"} 2.147483648e+09
+pve_vm_memory_max_bytes{name="build-vm",node="pve2",type="qemu",vmid="100"} 8.589934592e+09
+pve_vm_memory_max_bytes{name="dmz",node="pve2",type="qemu",vmid="154"} 2.147483648e+09
+pve_vm_memory_max_bytes{name="media",node="pve2",type="qemu",vmid="151"} 4.294967296e+09
+pve_vm_memory_max_bytes{name="nas",node="pve2",type="qemu",vmid="152"} 6.442450944e+09
+pve_vm_memory_max_bytes{name="opn",node="pve2",type="qemu",vmid="102"} 2.147483648e+09
+pve_vm_memory_max_bytes{name="stream",node="pve2",type="lxc",vmid="120"} 8.589934592e+09
+pve_vm_memory_max_bytes{name="template-lxc-docker",node="pve2",type="lxc",vmid="998"} 1.073741824e+09
+pve_vm_memory_max_bytes{name="template-lxc-unpriv",node="pve2",type="lxc",vmid="999"} 1.073741824e+09
+pve_vm_memory_max_bytes{name="template-vm",node="pve2",type="qemu",vmid="1000"} 2.147483648e+09
+pve_vm_memory_max_bytes{name="users",node="pve2",type="qemu",vmid="153"} 1.073741824e+09
+# HELP pve_vm_memory_used_bytes VM/Container memory usage in bytes
+# TYPE pve_vm_memory_used_bytes gauge
+pve_vm_memory_used_bytes{name="apps",node="pve2",type="qemu",vmid="150"} 4.253490176e+09
+pve_vm_memory_used_bytes{name="backupondra",node="pve2",type="lxc",vmid="103"} 4.7071232e+07
+pve_vm_memory_used_bytes{name="build-vm",node="pve2",type="qemu",vmid="100"} 0
+pve_vm_memory_used_bytes{name="dmz",node="pve2",type="qemu",vmid="154"} 1.813997568e+09
+pve_vm_memory_used_bytes{name="media",node="pve2",type="qemu",vmid="151"} 4.28905984e+09
+pve_vm_memory_used_bytes{name="nas",node="pve2",type="qemu",vmid="152"} 6.05953024e+09
+pve_vm_memory_used_bytes{name="opn",node="pve2",type="qemu",vmid="102"} 2.17750528e+09
+pve_vm_memory_used_bytes{name="stream",node="pve2",type="lxc",vmid="120"} 1.70348544e+08
+pve_vm_memory_used_bytes{name="template-lxc-docker",node="pve2",type="lxc",vmid="998"} 0
+pve_vm_memory_used_bytes{name="template-lxc-unpriv",node="pve2",type="lxc",vmid="999"} 0
+pve_vm_memory_used_bytes{name="template-vm",node="pve2",type="qemu",vmid="1000"} 0
+pve_vm_memory_used_bytes{name="users",node="pve2",type="qemu",vmid="153"} 1.095579648e+09
+# HELP pve_vm_network_in_bytes_total VM/Container network input in bytes
+# TYPE pve_vm_network_in_bytes_total counter
+pve_vm_network_in_bytes_total{name="apps",node="pve2",type="qemu",vmid="150"} 6.25609536e+08
+pve_vm_network_in_bytes_total{name="backupondra",node="pve2",type="lxc",vmid="103"} 3.747056e+06
+pve_vm_network_in_bytes_total{name="build-vm",node="pve2",type="qemu",vmid="100"} 0
+pve_vm_network_in_bytes_total{name="dmz",node="pve2",type="qemu",vmid="154"} 4.87865297e+08
+pve_vm_network_in_bytes_total{name="media",node="pve2",type="qemu",vmid="151"} 8.4754484e+07
+pve_vm_network_in_bytes_total{name="nas",node="pve2",type="qemu",vmid="152"} 3.55751057e+08
+pve_vm_network_in_bytes_total{name="opn",node="pve2",type="qemu",vmid="102"} 6.322575594e+09
+pve_vm_network_in_bytes_total{name="stream",node="pve2",type="lxc",vmid="120"} 2.8457856e+07
+pve_vm_network_in_bytes_total{name="template-lxc-docker",node="pve2",type="lxc",vmid="998"} 0
+pve_vm_network_in_bytes_total{name="template-lxc-unpriv",node="pve2",type="lxc",vmid="999"} 0
+pve_vm_network_in_bytes_total{name="template-vm",node="pve2",type="qemu",vmid="1000"} 0
+pve_vm_network_in_bytes_total{name="users",node="pve2",type="qemu",vmid="153"} 1.7808726429e+10
+# HELP pve_vm_network_out_bytes_total VM/Container network output in bytes
+# TYPE pve_vm_network_out_bytes_total counter
+pve_vm_network_out_bytes_total{name="apps",node="pve2",type="qemu",vmid="150"} 8.834802e+07
+pve_vm_network_out_bytes_total{name="backupondra",node="pve2",type="lxc",vmid="103"} 5.9810784e+07
+pve_vm_network_out_bytes_total{name="build-vm",node="pve2",type="qemu",vmid="100"} 0
+pve_vm_network_out_bytes_total{name="dmz",node="pve2",type="qemu",vmid="154"} 4.93083274e+08
+pve_vm_network_out_bytes_total{name="media",node="pve2",type="qemu",vmid="151"} 1.304484962e+09
+pve_vm_network_out_bytes_total{name="nas",node="pve2",type="qemu",vmid="152"} 1.82850315e+08
+pve_vm_network_out_bytes_total{name="opn",node="pve2",type="qemu",vmid="102"} 6.297117016e+09
+pve_vm_network_out_bytes_total{name="stream",node="pve2",type="lxc",vmid="120"} 2.1191132e+07
+pve_vm_network_out_bytes_total{name="template-lxc-docker",node="pve2",type="lxc",vmid="998"} 0
+pve_vm_network_out_bytes_total{name="template-lxc-unpriv",node="pve2",type="lxc",vmid="999"} 0
+pve_vm_network_out_bytes_total{name="template-vm",node="pve2",type="qemu",vmid="1000"} 0
+pve_vm_network_out_bytes_total{name="users",node="pve2",type="qemu",vmid="153"} 9.979921384e+09
+# HELP pve_vm_status VM/Container status (1=running, 0=stopped)
+# TYPE pve_vm_status gauge
+pve_vm_status{name="apps",node="pve2",type="qemu",vmid="150"} 1
+pve_vm_status{name="backupondra",node="pve2",type="lxc",vmid="103"} 1
+pve_vm_status{name="build-vm",node="pve2",type="qemu",vmid="100"} 0
+pve_vm_status{name="dmz",node="pve2",type="qemu",vmid="154"} 1
+pve_vm_status{name="media",node="pve2",type="qemu",vmid="151"} 1
+pve_vm_status{name="nas",node="pve2",type="qemu",vmid="152"} 1
+pve_vm_status{name="opn",node="pve2",type="qemu",vmid="102"} 1
+pve_vm_status{name="stream",node="pve2",type="lxc",vmid="120"} 1
+pve_vm_status{name="template-lxc-docker",node="pve2",type="lxc",vmid="998"} 0
+pve_vm_status{name="template-lxc-unpriv",node="pve2",type="lxc",vmid="999"} 0
+pve_vm_status{name="template-vm",node="pve2",type="qemu",vmid="1000"} 0
+pve_vm_status{name="users",node="pve2",type="qemu",vmid="153"} 1
+# HELP pve_vm_uptime_seconds VM/Container uptime in seconds
+# TYPE pve_vm_uptime_seconds gauge
+pve_vm_uptime_seconds{name="apps",node="pve2",type="qemu",vmid="150"} 24315
+pve_vm_uptime_seconds{name="backupondra",node="pve2",type="lxc",vmid="103"} 24337
+pve_vm_uptime_seconds{name="build-vm",node="pve2",type="qemu",vmid="100"} 0
+pve_vm_uptime_seconds{name="dmz",node="pve2",type="qemu",vmid="154"} 24299
+pve_vm_uptime_seconds{name="media",node="pve2",type="qemu",vmid="151"} 24335
+pve_vm_uptime_seconds{name="nas",node="pve2",type="qemu",vmid="152"} 24331
+pve_vm_uptime_seconds{name="opn",node="pve2",type="qemu",vmid="102"} 24352
+pve_vm_uptime_seconds{name="stream",node="pve2",type="lxc",vmid="120"} 24327
+pve_vm_uptime_seconds{name="template-lxc-docker",node="pve2",type="lxc",vmid="998"} 0
+pve_vm_uptime_seconds{name="template-lxc-unpriv",node="pve2",type="lxc",vmid="999"} 0
+pve_vm_uptime_seconds{name="template-vm",node="pve2",type="qemu",vmid="1000"} 0
+pve_vm_uptime_seconds{name="users",node="pve2",type="qemu",vmid="153"} 24304

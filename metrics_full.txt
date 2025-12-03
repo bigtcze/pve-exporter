@@ -1,0 +1,24 @@
+# HELP pve_storage_available_bytes Available storage in bytes
+# TYPE pve_storage_available_bytes gauge
+pve_storage_available_bytes{node="pve2",storage="PBS2",type="pbs"} 4.364769132544e+12
+pve_storage_available_bytes{node="pve2",storage="hdd_raidz1",type="zfspool"} 6.330771745024e+12
+pve_storage_available_bytes{node="pve2",storage="hdd_raidz1_iso",type="dir"} 6.33077170176e+12
+pve_storage_available_bytes{node="pve2",storage="local",type="dir"} 0
+pve_storage_available_bytes{node="pve2",storage="local-zfs",type="zfspool"} 7.6083398656e+11
+pve_storage_available_bytes{node="pve2",storage="pbs_datastore",type="dir"} 4.364769132544e+12
+# HELP pve_storage_total_bytes Total storage size in bytes
+# TYPE pve_storage_total_bytes gauge
+pve_storage_total_bytes{node="pve2",storage="PBS2",type="pbs"} 5.952693100544e+12
+pve_storage_total_bytes{node="pve2",storage="hdd_raidz1",type="zfspool"} 1.1483534589952e+13
+pve_storage_total_bytes{node="pve2",storage="hdd_raidz1_iso",type="dir"} 6.342742900736e+12
+pve_storage_total_bytes{node="pve2",storage="local",type="dir"} 0
+pve_storage_total_bytes{node="pve2",storage="local-zfs",type="zfspool"} 9.5917289472e+11
+pve_storage_total_bytes{node="pve2",storage="pbs_datastore",type="dir"} 5.952693100544e+12
+# HELP pve_storage_used_bytes Used storage in bytes
+# TYPE pve_storage_used_bytes gauge
+pve_storage_used_bytes{node="pve2",storage="PBS2",type="pbs"} 1.287848517632e+12
+pve_storage_used_bytes{node="pve2",storage="hdd_raidz1",type="zfspool"} 5.152762844928e+12
+pve_storage_used_bytes{node="pve2",storage="hdd_raidz1_iso",type="dir"} 1.1971198976e+10
+pve_storage_used_bytes{node="pve2",storage="local",type="dir"} 0
+pve_storage_used_bytes{node="pve2",storage="local-zfs",type="zfspool"} 1.9833890816e+11
+pve_storage_used_bytes{node="pve2",storage="pbs_datastore",type="dir"} 1.287848517632e+12

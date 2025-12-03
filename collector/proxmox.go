@@ -401,7 +401,7 @@ func (c *ProxmoxCollector) collectResourceMetrics(ch chan<- prometheus.Metric, n
 
 	var result struct {
 		Data []struct {
-			VMID      string  `json:"vmid"`
+			VMID      int64   `json:"vmid"`
 			Name      string  `json:"name"`
 			Status    string  `json:"status"`
 			Uptime    float64 `json:"uptime"`
@@ -428,7 +428,7 @@ func (c *ProxmoxCollector) collectResourceMetrics(ch chan<- prometheus.Metric, n
 			status = 1.0
 		}
 
-		labels := []string{node, resType, vm.VMID, vm.Name}
+		labels := []string{node, resType, fmt.Sprintf("%d", vm.VMID), vm.Name}
 
 		ch <- prometheus.MustNewConstMetric(c.vmStatus, prometheus.GaugeValue, status, labels...)
 		ch <- prometheus.MustNewConstMetric(c.vmUptime, prometheus.GaugeValue, vm.Uptime, labels...)
