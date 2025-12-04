@@ -63,6 +63,23 @@ type ProxmoxCollector struct {
 	vmDiskRead  *prometheus.Desc
 	vmDiskWrite *prometheus.Desc
 	vmHAManaged *prometheus.Desc
+	vmPID       *prometheus.Desc
+	vmMemHost   *prometheus.Desc
+	// VM pressure metrics (Linux PSI)
+	vmPressureCPUFull    *prometheus.Desc
+	vmPressureCPUSome    *prometheus.Desc
+	vmPressureIOFull     *prometheus.Desc
+	vmPressureIOSome     *prometheus.Desc
+	vmPressureMemoryFull *prometheus.Desc
+	vmPressureMemorySome *prometheus.Desc
+	// VM balloon info
+	vmBalloonActual        *prometheus.Desc
+	vmBalloonMaxMem        *prometheus.Desc
+	vmBalloonTotalMem      *prometheus.Desc
+	vmBalloonMajorFaults   *prometheus.Desc
+	vmBalloonMinorFaults   *prometheus.Desc
+	vmBalloonMemSwappedIn  *prometheus.Desc
+	vmBalloonMemSwappedOut *prometheus.Desc
 
 	// LXC metrics
 	lxcStatus    *prometheus.Desc
@@ -77,10 +94,17 @@ type ProxmoxCollector struct {
 	lxcNetOut    *prometheus.Desc
 	lxcDiskRead  *prometheus.Desc
 	lxcDiskWrite *prometheus.Desc
-	// New LXC metrics
 	lxcSwap      *prometheus.Desc
 	lxcMaxSwap   *prometheus.Desc
 	lxcHAManaged *prometheus.Desc
+	lxcPID       *prometheus.Desc
+	// LXC pressure metrics (Linux PSI)
+	lxcPressureCPUFull    *prometheus.Desc
+	lxcPressureCPUSome    *prometheus.Desc
+	lxcPressureIOFull     *prometheus.Desc
+	lxcPressureIOSome     *prometheus.Desc
+	lxcPressureMemoryFull *prometheus.Desc
+	lxcPressureMemorySome *prometheus.Desc
 
 	// Storage metrics
 	storageTotal        *prometheus.Desc
@@ -304,6 +328,83 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 			"VM is managed by HA (1=yes, 0=no)",
 			[]string{"node", "vmid", "name"}, nil,
 		),
+		vmPID: prometheus.NewDesc(
+			"pve_vm_pid",
+			"VM process ID",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		vmMemHost: prometheus.NewDesc(
+			"pve_vm_memory_host_bytes",
+			"VM host memory allocation in bytes",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		// VM pressure metrics (Linux PSI)
+		vmPressureCPUFull: prometheus.NewDesc(
+			"pve_vm_pressure_cpu_full",
+			"VM CPU pressure full ratio",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		vmPressureCPUSome: prometheus.NewDesc(
+			"pve_vm_pressure_cpu_some",
+			"VM CPU pressure some ratio",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		vmPressureIOFull: prometheus.NewDesc(
+			"pve_vm_pressure_io_full",
+			"VM I/O pressure full ratio",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		vmPressureIOSome: prometheus.NewDesc(
+			"pve_vm_pressure_io_some",
+			"VM I/O pressure some ratio",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		vmPressureMemoryFull: prometheus.NewDesc(
+			"pve_vm_pressure_memory_full",
+			"VM memory pressure full ratio",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		vmPressureMemorySome: prometheus.NewDesc(
+			"pve_vm_pressure_memory_some",
+			"VM memory pressure some ratio",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		// VM balloon info
+		vmBalloonActual: prometheus.NewDesc(
+			"pve_vm_balloon_actual_bytes",
+			"VM balloon actual memory in bytes",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		vmBalloonMaxMem: prometheus.NewDesc(
+			"pve_vm_balloon_max_bytes",
+			"VM balloon maximum memory in bytes",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		vmBalloonTotalMem: prometheus.NewDesc(
+			"pve_vm_balloon_total_bytes",
+			"VM balloon total guest memory in bytes",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		vmBalloonMajorFaults: prometheus.NewDesc(
+			"pve_vm_balloon_major_page_faults_total",
+			"VM major page faults",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		vmBalloonMinorFaults: prometheus.NewDesc(
+			"pve_vm_balloon_minor_page_faults_total",
+			"VM minor page faults",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		vmBalloonMemSwappedIn: prometheus.NewDesc(
+			"pve_vm_balloon_mem_swapped_in_bytes",
+			"VM memory swapped in",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		vmBalloonMemSwappedOut: prometheus.NewDesc(
+			"pve_vm_balloon_mem_swapped_out_bytes",
+			"VM memory swapped out",
+			[]string{"node", "vmid", "name"}, nil,
+		),
 
 		// LXC metrics
 		lxcStatus: prometheus.NewDesc(
@@ -379,6 +480,42 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 		lxcHAManaged: prometheus.NewDesc(
 			"pve_lxc_ha_managed",
 			"LXC is managed by HA (1=yes, 0=no)",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		lxcPID: prometheus.NewDesc(
+			"pve_lxc_pid",
+			"LXC process ID",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		// LXC pressure metrics (Linux PSI)
+		lxcPressureCPUFull: prometheus.NewDesc(
+			"pve_lxc_pressure_cpu_full",
+			"LXC CPU pressure full ratio",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		lxcPressureCPUSome: prometheus.NewDesc(
+			"pve_lxc_pressure_cpu_some",
+			"LXC CPU pressure some ratio",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		lxcPressureIOFull: prometheus.NewDesc(
+			"pve_lxc_pressure_io_full",
+			"LXC I/O pressure full ratio",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		lxcPressureIOSome: prometheus.NewDesc(
+			"pve_lxc_pressure_io_some",
+			"LXC I/O pressure some ratio",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		lxcPressureMemoryFull: prometheus.NewDesc(
+			"pve_lxc_pressure_memory_full",
+			"LXC memory pressure full ratio",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		lxcPressureMemorySome: prometheus.NewDesc(
+			"pve_lxc_pressure_memory_some",
+			"LXC memory pressure some ratio",
 			[]string{"node", "vmid", "name"}, nil,
 		),
 
@@ -468,6 +605,21 @@ func (c *ProxmoxCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.vmDiskRead
 	ch <- c.vmDiskWrite
 	ch <- c.vmHAManaged
+	ch <- c.vmPID
+	ch <- c.vmMemHost
+	ch <- c.vmPressureCPUFull
+	ch <- c.vmPressureCPUSome
+	ch <- c.vmPressureIOFull
+	ch <- c.vmPressureIOSome
+	ch <- c.vmPressureMemoryFull
+	ch <- c.vmPressureMemorySome
+	ch <- c.vmBalloonActual
+	ch <- c.vmBalloonMaxMem
+	ch <- c.vmBalloonTotalMem
+	ch <- c.vmBalloonMajorFaults
+	ch <- c.vmBalloonMinorFaults
+	ch <- c.vmBalloonMemSwappedIn
+	ch <- c.vmBalloonMemSwappedOut
 	ch <- c.lxcStatus
 	ch <- c.lxcUptime
 	ch <- c.lxcCPU
@@ -483,6 +635,13 @@ func (c *ProxmoxCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.lxcSwap
 	ch <- c.lxcMaxSwap
 	ch <- c.lxcHAManaged
+	ch <- c.lxcPID
+	ch <- c.lxcPressureCPUFull
+	ch <- c.lxcPressureCPUSome
+	ch <- c.lxcPressureIOFull
+	ch <- c.lxcPressureIOSome
+	ch <- c.lxcPressureMemoryFull
+	ch <- c.lxcPressureMemorySome
 	ch <- c.storageTotal
 	ch <- c.storageUsed
 	ch <- c.storageAvail
@@ -835,7 +994,7 @@ func (c *ProxmoxCollector) collectResourceMetrics(ch chan<- prometheus.Metric, n
 	return len(result.Data)
 }
 
-// collectVMDetailedMetrics fetches detailed VM metrics (balloon, freemem, HA)
+// collectVMDetailedMetrics fetches detailed VM metrics (balloon, freemem, HA, pressure, ballooninfo)
 func (c *ProxmoxCollector) collectVMDetailedMetrics(ch chan<- prometheus.Metric, node string, vmid int64, labels []string) {
 	path := fmt.Sprintf("/nodes/%s/qemu/%d/status/current", node, vmid)
 	data, err := c.apiRequest(path)
@@ -847,9 +1006,26 @@ func (c *ProxmoxCollector) collectVMDetailedMetrics(ch chan<- prometheus.Metric,
 		Data struct {
 			Balloon float64 `json:"balloon"`
 			FreeMem float64 `json:"freemem"`
+			PID     float64 `json:"pid"`
+			MemHost float64 `json:"memhost"`
 			HA      struct {
 				Managed int `json:"managed"`
 			} `json:"ha"`
+			BalloonInfo struct {
+				Actual          float64 `json:"actual"`
+				MaxMem          float64 `json:"max_mem"`
+				TotalMem        float64 `json:"total_mem"`
+				MajorPageFaults float64 `json:"major_page_faults"`
+				MinorPageFaults float64 `json:"minor_page_faults"`
+				MemSwappedIn    float64 `json:"mem_swapped_in"`
+				MemSwappedOut   float64 `json:"mem_swapped_out"`
+			} `json:"ballooninfo"`
+			PressureCPUFull    float64 `json:"pressurecpufull"`
+			PressureCPUSome    float64 `json:"pressurecpusome"`
+			PressureIOFull     float64 `json:"pressureiofull"`
+			PressureIOSome     float64 `json:"pressureiosome"`
+			PressureMemoryFull float64 `json:"pressurememoryfull"`
+			PressureMemorySome float64 `json:"pressurememorysome"`
 		} `json:"data"`
 	}
 
@@ -860,9 +1036,26 @@ func (c *ProxmoxCollector) collectVMDetailedMetrics(ch chan<- prometheus.Metric,
 	ch <- prometheus.MustNewConstMetric(c.vmBalloon, prometheus.GaugeValue, result.Data.Balloon, labels...)
 	ch <- prometheus.MustNewConstMetric(c.vmFreeMem, prometheus.GaugeValue, result.Data.FreeMem, labels...)
 	ch <- prometheus.MustNewConstMetric(c.vmHAManaged, prometheus.GaugeValue, float64(result.Data.HA.Managed), labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmPID, prometheus.GaugeValue, result.Data.PID, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmMemHost, prometheus.GaugeValue, result.Data.MemHost, labels...)
+	// Pressure metrics
+	ch <- prometheus.MustNewConstMetric(c.vmPressureCPUFull, prometheus.GaugeValue, result.Data.PressureCPUFull, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmPressureCPUSome, prometheus.GaugeValue, result.Data.PressureCPUSome, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmPressureIOFull, prometheus.GaugeValue, result.Data.PressureIOFull, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmPressureIOSome, prometheus.GaugeValue, result.Data.PressureIOSome, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmPressureMemoryFull, prometheus.GaugeValue, result.Data.PressureMemoryFull, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmPressureMemorySome, prometheus.GaugeValue, result.Data.PressureMemorySome, labels...)
+	// Balloon info
+	ch <- prometheus.MustNewConstMetric(c.vmBalloonActual, prometheus.GaugeValue, result.Data.BalloonInfo.Actual, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmBalloonMaxMem, prometheus.GaugeValue, result.Data.BalloonInfo.MaxMem, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmBalloonTotalMem, prometheus.GaugeValue, result.Data.BalloonInfo.TotalMem, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmBalloonMajorFaults, prometheus.CounterValue, result.Data.BalloonInfo.MajorPageFaults, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmBalloonMinorFaults, prometheus.CounterValue, result.Data.BalloonInfo.MinorPageFaults, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmBalloonMemSwappedIn, prometheus.GaugeValue, result.Data.BalloonInfo.MemSwappedIn, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmBalloonMemSwappedOut, prometheus.GaugeValue, result.Data.BalloonInfo.MemSwappedOut, labels...)
 }
 
-// collectLXCSwapMetrics fetches swap and HA metrics for LXC containers
+// collectLXCSwapMetrics fetches swap, HA, PID, and pressure metrics for LXC containers
 func (c *ProxmoxCollector) collectLXCSwapMetrics(ch chan<- prometheus.Metric, node string, vmid int64, labels []string) {
 	path := fmt.Sprintf("/nodes/%s/lxc/%d/status/current", node, vmid)
 	data, err := c.apiRequest(path)
@@ -874,9 +1067,16 @@ func (c *ProxmoxCollector) collectLXCSwapMetrics(ch chan<- prometheus.Metric, no
 		Data struct {
 			Swap    float64 `json:"swap"`
 			MaxSwap float64 `json:"maxswap"`
+			PID     float64 `json:"pid"`
 			HA      struct {
 				Managed int `json:"managed"`
 			} `json:"ha"`
+			PressureCPUFull    string `json:"pressurecpufull"`
+			PressureCPUSome    string `json:"pressurecpusome"`
+			PressureIOFull     string `json:"pressureiofull"`
+			PressureIOSome     string `json:"pressureiosome"`
+			PressureMemoryFull string `json:"pressurememoryfull"`
+			PressureMemorySome string `json:"pressurememorysome"`
 		} `json:"data"`
 	}
 
@@ -887,6 +1087,26 @@ func (c *ProxmoxCollector) collectLXCSwapMetrics(ch chan<- prometheus.Metric, no
 	ch <- prometheus.MustNewConstMetric(c.lxcSwap, prometheus.GaugeValue, result.Data.Swap, labels...)
 	ch <- prometheus.MustNewConstMetric(c.lxcMaxSwap, prometheus.GaugeValue, result.Data.MaxSwap, labels...)
 	ch <- prometheus.MustNewConstMetric(c.lxcHAManaged, prometheus.GaugeValue, float64(result.Data.HA.Managed), labels...)
+	ch <- prometheus.MustNewConstMetric(c.lxcPID, prometheus.GaugeValue, result.Data.PID, labels...)
+	// Pressure metrics (LXC returns strings)
+	if cpuFull, err := strconv.ParseFloat(result.Data.PressureCPUFull, 64); err == nil {
+		ch <- prometheus.MustNewConstMetric(c.lxcPressureCPUFull, prometheus.GaugeValue, cpuFull, labels...)
+	}
+	if cpuSome, err := strconv.ParseFloat(result.Data.PressureCPUSome, 64); err == nil {
+		ch <- prometheus.MustNewConstMetric(c.lxcPressureCPUSome, prometheus.GaugeValue, cpuSome, labels...)
+	}
+	if ioFull, err := strconv.ParseFloat(result.Data.PressureIOFull, 64); err == nil {
+		ch <- prometheus.MustNewConstMetric(c.lxcPressureIOFull, prometheus.GaugeValue, ioFull, labels...)
+	}
+	if ioSome, err := strconv.ParseFloat(result.Data.PressureIOSome, 64); err == nil {
+		ch <- prometheus.MustNewConstMetric(c.lxcPressureIOSome, prometheus.GaugeValue, ioSome, labels...)
+	}
+	if memFull, err := strconv.ParseFloat(result.Data.PressureMemoryFull, 64); err == nil {
+		ch <- prometheus.MustNewConstMetric(c.lxcPressureMemoryFull, prometheus.GaugeValue, memFull, labels...)
+	}
+	if memSome, err := strconv.ParseFloat(result.Data.PressureMemorySome, 64); err == nil {
+		ch <- prometheus.MustNewConstMetric(c.lxcPressureMemorySome, prometheus.GaugeValue, memSome, labels...)
+	}
 }
 
 // collectStorageMetrics collects storage metrics

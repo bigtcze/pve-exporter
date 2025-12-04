@@ -198,13 +198,28 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_vm_memory_used_bytes` | Used memory in bytes |
 | `pve_vm_memory_max_bytes` | Total memory in bytes |
 | `pve_vm_memory_free_bytes` | Free memory (guest agent) |
+| `pve_vm_memory_host_bytes` | Host memory allocation |
 | `pve_vm_balloon_bytes` | Balloon target in bytes |
+| `pve_vm_balloon_actual_bytes` | Balloon actual memory |
+| `pve_vm_balloon_max_bytes` | Balloon max memory |
+| `pve_vm_balloon_total_bytes` | Balloon total guest memory |
+| `pve_vm_balloon_major_page_faults_total` | Major page faults |
+| `pve_vm_balloon_minor_page_faults_total` | Minor page faults |
+| `pve_vm_balloon_mem_swapped_in_bytes` | Memory swapped in |
+| `pve_vm_balloon_mem_swapped_out_bytes` | Memory swapped out |
 | `pve_vm_disk_max_bytes` | Total disk space in bytes |
 | `pve_vm_network_in_bytes_total` | Network input bytes |
 | `pve_vm_network_out_bytes_total` | Network output bytes |
 | `pve_vm_disk_read_bytes_total` | Disk read bytes |
 | `pve_vm_disk_write_bytes_total` | Disk write bytes |
 | `pve_vm_ha_managed` | Managed by HA (1=yes) |
+| `pve_vm_pid` | Process ID |
+| `pve_vm_pressure_cpu_full` | CPU pressure full |
+| `pve_vm_pressure_cpu_some` | CPU pressure some |
+| `pve_vm_pressure_io_full` | I/O pressure full |
+| `pve_vm_pressure_io_some` | I/O pressure some |
+| `pve_vm_pressure_memory_full` | Memory pressure full |
+| `pve_vm_pressure_memory_some` | Memory pressure some |
 | `pve_guest_last_backup_timestamp_seconds` | Timestamp of the last backup |
 
 ### LXC Metrics (Containers)
@@ -226,6 +241,13 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_lxc_disk_read_bytes_total` | Disk read bytes |
 | `pve_lxc_disk_write_bytes_total` | Disk write bytes |
 | `pve_lxc_ha_managed` | Managed by HA (1=yes) |
+| `pve_lxc_pid` | Process ID |
+| `pve_lxc_pressure_cpu_full` | CPU pressure full |
+| `pve_lxc_pressure_cpu_some` | CPU pressure some |
+| `pve_lxc_pressure_io_full` | I/O pressure full |
+| `pve_lxc_pressure_io_some` | I/O pressure some |
+| `pve_lxc_pressure_memory_full` | Memory pressure full |
+| `pve_lxc_pressure_memory_some` | Memory pressure some |
 | `pve_guest_last_backup_timestamp_seconds` | Timestamp of the last backup |
 
 ### Storage Metrics
