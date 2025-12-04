@@ -234,6 +234,31 @@ The exporter exposes the following metrics at `/metrics`.
 
 ### LXC Metrics (Containers)
 
+| Metric | Description |
+|--------|-------------|
+| `pve_lxc_status` | LXC status (1=running, 0=stopped) |
+| `pve_lxc_uptime_seconds` | LXC uptime in seconds |
+| `pve_lxc_cpu_usage` | LXC CPU usage (0.0-1.0) |
+| `pve_lxc_cpus` | Number of CPUs allocated |
+| `pve_lxc_memory_used_bytes` | Used memory in bytes |
+| `pve_lxc_memory_max_bytes` | Total memory in bytes |
+| `pve_lxc_disk_used_bytes` | Used disk space in bytes |
+| `pve_lxc_disk_max_bytes` | Total disk space in bytes |
+| `pve_lxc_swap_used_bytes` | Used swap in bytes |
+| `pve_lxc_swap_max_bytes` | Maximum swap in bytes |
+| `pve_lxc_network_in_bytes_total` | Network input bytes |
+| `pve_lxc_network_out_bytes_total` | Network output bytes |
+| `pve_lxc_disk_read_bytes_total` | Disk read bytes |
+| `pve_lxc_disk_write_bytes_total` | Disk write bytes |
+| `pve_lxc_ha_managed` | Managed by HA (1=yes) |
+| `pve_lxc_pid` | Process ID |
+| `pve_lxc_pressure_cpu_full` | CPU pressure full |
+| `pve_lxc_pressure_cpu_some` | CPU pressure some |
+| `pve_lxc_pressure_io_full` | I/O pressure full |
+| `pve_lxc_pressure_io_some` | I/O pressure some |
+| `pve_lxc_pressure_memory_full` | Memory pressure full |
+| `pve_lxc_pressure_memory_some` | Memory pressure some |
+| `pve_guest_last_backup_timestamp_seconds` | Timestamp of the last backup |
 
 ### Storage Metrics
 
@@ -246,6 +271,27 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_storage_enabled` | Storage is enabled (1=yes) |
 | `pve_storage_shared` | Storage is shared (1=yes) |
 | `pve_storage_used_fraction` | Used fraction (0.0-1.0) |
+
+### ZFS Metrics
+
+| Metric | Description |
+|--------|-------------|
+| `pve_zfs_pool_health_status` | Pool health (1=ONLINE) |
+| `pve_zfs_pool_size_bytes` | Pool total size |
+| `pve_zfs_pool_alloc_bytes` | Pool allocated size |
+| `pve_zfs_pool_free_bytes` | Pool free size |
+| `pve_zfs_pool_frag_percent` | Pool fragmentation % |
+| `pve_zfs_arc_size_bytes` | ARC size in bytes |
+| `pve_zfs_arc_min_size_bytes` | ARC min size |
+| `pve_zfs_arc_max_size_bytes` | ARC max size |
+| `pve_zfs_arc_hits_total` | ARC hits |
+| `pve_zfs_arc_misses_total` | ARC misses |
+| `pve_zfs_arc_hit_ratio` | ARC hit ratio |
+| `pve_zfs_arc_target_size_bytes` | ARC target size (c) |
+| `pve_zfs_arc_l2_hits_total` | L2ARC hits |
+| `pve_zfs_arc_l2_misses_total` | L2ARC misses |
+| `pve_zfs_arc_l2_size_bytes` | L2ARC size |
+| `pve_zfs_arc_l2_header_size_bytes` | L2ARC header size |
 
 ## 🔒 Authentication & Permissions
 
