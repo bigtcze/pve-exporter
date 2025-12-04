@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/bigtcze/pve-exporter/config"
@@ -1421,6 +1422,9 @@ func (c *ProxmoxCollector) collectBackupMetrics(ch chan<- prometheus.Metric) {
 		return
 	}
 
+	// Track latest backup per VM across all storages
+	globalLastBackups := make(map[string]int64)
+
 	for _, node := range nodesResult.Data {
 		// Get list of storages for the node
 		storagePath := fmt.Sprintf("/nodes/%s/storage", node.Node)
@@ -1434,6 +1438,7 @@ func (c *ProxmoxCollector) collectBackupMetrics(ch chan<- prometheus.Metric) {
 			Data []struct {
 				Storage string `json:"storage"`
 				Content string `json:"content"` // e.g. "backup,iso"
+				Type    string `json:"type"`    // e.g. "pbs", "dir", "nfs"
 			} `json:"data"`
 		}
 
@@ -1443,21 +1448,24 @@ func (c *ProxmoxCollector) collectBackupMetrics(ch chan<- prometheus.Metric) {
 		}
 
 		for _, storage := range storageResult.Data {
-			// Check if storage supports backups
-			// Note: We could check 'content' field but querying content=backup is safer/easier
+			// Skip storages that don't support backups
+			if !strings.Contains(storage.Content, "backup") {
+				continue
+			}
 
 			contentPath := fmt.Sprintf("/nodes/%s/storage/%s/content?content=backup", node.Node, storage.Storage)
 			contentData, err := c.apiRequest(contentPath)
 			if err != nil {
-				log.Printf("Error fetching backup content for storage %s on node %s: %v", storage.Storage, node.Node, err)
+				// This can happen if PBS is unreachable or storage doesn't support listing
 				continue
 			}
 
 			var contentResult struct {
 				Data []struct {
-					VolID string      `json:"volid"`
-					VMID  interface{} `json:"vmid"` // Can be string or int
-					CTime int64       `json:"ctime"`
+					VolID  string      `json:"volid"`
+					VMID   interface{} `json:"vmid"` // Can be string, int, or nil
+					CTime  int64       `json:"ctime"`
+					Format string      `json:"format"` // e.g. "pbs-vm", "vma.zst"
 				} `json:"data"`
 			}
 
@@ -1466,11 +1474,8 @@ func (c *ProxmoxCollector) collectBackupMetrics(ch chan<- prometheus.Metric) {
 				continue
 			}
 
-			// Track latest backup per VM
-			lastBackups := make(map[string]int64)
-
 			for _, item := range contentResult.Data {
-				// Parse VMID
+				// Parse VMID - try field first, then extract from volid
 				var vmid string
 				switch v := item.VMID.(type) {
 				case float64:
@@ -1478,26 +1483,66 @@ func (c *ProxmoxCollector) collectBackupMetrics(ch chan<- prometheus.Metric) {
 				case string:
 					vmid = v
 				default:
-					// Try to extract from volid if vmid field is missing/invalid
-					// Format: storage:backup/vzdump-qemu-100-2023...
-					// This is complex, skipping for now if vmid is missing
-					continue
+					// Try to extract from volid
+					// PBS format: storage:backup/vm/100/2023_12_01... or storage:backup/ct/100/...
+					// Standard format: storage:backup/vzdump-qemu-100-2023...
+					vmid = extractVMIDFromVolID(item.VolID)
+					if vmid == "" {
+						continue
+					}
 				}
 
-				if item.CTime > lastBackups[vmid] {
-					lastBackups[vmid] = item.CTime
+				if item.CTime > globalLastBackups[vmid] {
+					globalLastBackups[vmid] = item.CTime
 				}
 			}
+		}
 
-			for vmid, timestamp := range lastBackups {
-				ch <- prometheus.MustNewConstMetric(
-					c.guestLastBackup,
-					prometheus.GaugeValue,
-					float64(timestamp),
-					node.Node,
-					vmid,
-				)
+		// Emit metrics for this node
+		for vmid, timestamp := range globalLastBackups {
+			ch <- prometheus.MustNewConstMetric(
+				c.guestLastBackup,
+				prometheus.GaugeValue,
+				float64(timestamp),
+				node.Node,
+				vmid,
+			)
+		}
+	}
+}
+
+// extractVMIDFromVolID extracts VMID from backup volume ID
+// Formats:
+// - PBS: "storage:backup/vm/100/2023..." or "storage:backup/ct/100/..."
+// - Standard: "storage:backup/vzdump-qemu-100-2023..." or "storage:backup/vzdump-lxc-100-..."
+func extractVMIDFromVolID(volid string) string {
+	// Try PBS format first: backup/vm/100/ or backup/ct/100/
+	if strings.Contains(volid, "/vm/") || strings.Contains(volid, "/ct/") {
+		parts := strings.Split(volid, "/")
+		for i, p := range parts {
+			if (p == "vm" || p == "ct") && i+1 < len(parts) {
+				// Next part should be VMID
+				vmidPart := parts[i+1]
+				// Handle potential namespace:vmid format
+				if strings.Contains(vmidPart, ":") {
+					vmidPart = strings.Split(vmidPart, ":")[0]
+				}
+				return vmidPart
 			}
 		}
 	}
+
+	// Try standard vzdump format: vzdump-qemu-100-2023 or vzdump-lxc-100-2023
+	if strings.Contains(volid, "vzdump-") {
+		// Extract the part after "vzdump-qemu-" or "vzdump-lxc-"
+		parts := strings.Split(volid, "-")
+		for i, p := range parts {
+			if (p == "qemu" || p == "lxc") && i+1 < len(parts) {
+				// Next part should be VMID
+				return parts[i+1]
+			}
+		}
+	}
+
+	return ""
 }
