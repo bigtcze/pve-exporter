@@ -3,7 +3,6 @@
 ## Prerequisites
 
 - Go 1.21 or later
-- Docker (for container builds)
 - Access to a Proxmox VE instance for testing
 
 ## Local Development Setup
@@ -55,8 +54,6 @@ pve-exporter/
 │   └── workflows/         # CI/CD workflows
 ├── .agent/
 │   └── memory/            # AI persistent memory
-├── Dockerfile             # Container image definition
-├── docker-compose.yml     # Docker Compose example
 └── README.md              # Documentation
 ```
 
@@ -100,16 +97,10 @@ DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 go build -ldflags "-X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}" -o pve-exporter .
 ```
 
-### Build Docker Image
+### Cross-compile for Linux
 
 ```bash
-docker build -t pve-exporter:dev .
-```
-
-### Build Multi-Arch Docker Image
-
-```bash
-docker buildx build --platform linux/amd64,linux/arm64,linux/arm/v7 -t pve-exporter:dev .
+GOOS=linux GOARCH=amd64 go build -o pve-exporter-linux-amd64 .
 ```
 
 ## Adding New Metrics
@@ -207,39 +198,33 @@ chore: update dependencies
 
 ### Pre-Push Verification
 
-Before pushing any changes to the repository, you **MUST** verify that the application builds and runs locally using Docker Desktop. This ensures that the CI/CD pipeline will not fail due to build issues.
-
-1.  **Build Binary Locally:**
-    ```bash
-    go build -o pve-exporter .
-    ```
-
-2.  **Build Docker Image:**
-    ```bash
-    docker build -t pve-exporter:test .
-    ```
-
-3.  **Test Container Startup:**
-    ```bash
-    docker run --rm pve-exporter:test
-    ```
-    *Note: It is expected that the container might exit with an error if no configuration is provided, but it should not fail to start due to missing dependencies or binary format errors.*
+Before pushing, verify the build:
+```bash
+go build -o pve-exporter .
+```
 
 ## Release Process
 
-Releases are automated via GitHub Actions:
+Releases are automated via GitHub Actions. The release body comes from the annotated tag message.
 
-1. Merge changes to `master` branch
-2. Create and push a version tag:
+1. Commit and push changes to `main` branch
+2. Create an **annotated tag** with release summary:
    ```bash
-   git tag -a v1.0.0 -m "Release v1.0.0"
-   git push origin v1.0.0
+   git tag -a v1.0.9 -m "v1.0.9
+
+   ## 🚀 What's New
+   - Feature X
+   - Feature Y
+
+   ## 🐛 Bug Fixes
+   - Fixed issue Z
+   "
+   git push origin v1.0.9
    ```
 3. GitHub Actions will:
    - Run tests
-   - Build multi-arch binaries
-   - Build and push Docker images
-   - Create a GitHub release
+   - Build multi-arch binaries (amd64, arm64, armv7)
+   - Create GitHub release with tag annotation as body
 
 ## Troubleshooting
 

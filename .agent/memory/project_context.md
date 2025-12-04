@@ -50,11 +50,12 @@ The Proxmox Exporter is a specialized Prometheus exporter written in Go that col
 - Gracefully handles missing ZFS (returns no metrics)
 - Can be disabled via configuration
 
-### Docker Deployment
-- Multi-stage build for minimal image size
-- Non-root user for security
-- Health check endpoint for container orchestration
-- Multi-architecture support (amd64, arm64, armv7)
+### Systemd Deployment
+- Single static binary installed to `/usr/local/bin/`
+- Runs under dedicated non-root user (`pve-exporter`)
+- Config file at `/etc/pve-exporter/config.yml` with restricted permissions
+- Systemd service with security hardening (NoNewPrivileges, ProtectSystem, etc.)
+- Multi-architecture builds (amd64, arm64, armv7)
 
 ## Metric Naming Convention
 

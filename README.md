@@ -9,37 +9,115 @@ A professional Prometheus exporter for Proxmox VE, written in Go. It collects co
 ## 🚀 Features
 
 - **Comprehensive Metrics**:
-  - **Node**: CPU, Memory, Uptime, Status.
-  - **VM (QEMU)**: CPU, Memory, Disk, Network I/O, Uptime, Status.
-  - **LXC Containers**: CPU, Memory, Disk, Network I/O, Uptime, Status.
+  - **Node**: CPU, Memory, Uptime, Status, VM/LXC counts.
+  - **VM (QEMU)**: CPU, Memory, Disk, Network I/O, Uptime, Status, Backup timestamps.
+  - **LXC Containers**: CPU, Memory, Disk, Network I/O, Uptime, Status, Backup timestamps.
   - **Storage**: Usage, Availability, Total size.
 - **Secure**: Supports API Token authentication (recommended) and standard password auth.
-- **Lightweight**: Built as a single binary or minimal Docker container.
+- **Lightweight**: Single static binary, runs as systemd service.
 - **Easy Configuration**: Configure via environment variables or YAML file.
 
 ## ⚡ Quick Start
 
-### Docker
-
-```bash
-docker run -d \
-  -p 9221:9221 \
-  -e PVE_USER="root@pam" \
-  -e PVE_PASSWORD="your-password" \
-  -e PVE_HOST="proxmox.example.com" \
-  --name pve-exporter \
-  ghcr.io/bigtcze/pve-exporter:latest
-```
-
-### Binary
+### Download Binary
 
 ```bash
 # Download latest release
-wget https://github.com/bigtcze/pve-exporter/releases/latest/download/pve-exporter_linux_amd64
-chmod +x pve-exporter_linux_amd64
+wget https://github.com/bigtcze/pve-exporter/releases/latest/download/pve-exporter-linux-amd64
+chmod +x pve-exporter-linux-amd64
 
-# Run
-./pve-exporter_linux_amd64 -config config.yml
+# Run manually
+./pve-exporter-linux-amd64 -config config.yml
+```
+
+## 🔧 Systemd Service Installation
+
+For production use, install the exporter as a systemd service running under a dedicated user.
+
+### 1. Create dedicated user
+
+```bash
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin pve-exporter
+```
+
+### 2. Install binary
+
+```bash
+sudo wget -O /usr/local/bin/pve-exporter \
+  https://github.com/bigtcze/pve-exporter/releases/latest/download/pve-exporter-linux-amd64
+sudo chmod +x /usr/local/bin/pve-exporter
+```
+
+### 3. Create configuration
+
+```bash
+sudo mkdir -p /etc/pve-exporter
+sudo cat > /etc/pve-exporter/config.yml << 'EOF'
+proxmox:
+  host: "proxmox.example.com"
+  port: 8006
+  # Recommended: Use API Token instead of password
+  token_id: "monitoring@pve!exporter"
+  token_secret: "your-token-secret"
+  insecure_skip_verify: true
+
+server:
+  listen_address: ":9221"
+  metrics_path: "/metrics"
+EOF
+
+# Secure the config file (contains credentials)
+sudo chown root:pve-exporter /etc/pve-exporter/config.yml
+sudo chmod 640 /etc/pve-exporter/config.yml
+```
+
+### 4. Create systemd service
+
+```bash
+sudo cat > /etc/systemd/system/pve-exporter.service << 'EOF'
+[Unit]
+Description=Proxmox VE Exporter for Prometheus
+Documentation=https://github.com/bigtcze/pve-exporter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pve-exporter
+Group=pve-exporter
+ExecStart=/usr/local/bin/pve-exporter -config /etc/pve-exporter/config.yml
+Restart=on-failure
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ReadOnlyPaths=/
+ReadWritePaths=
+
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+
+### 5. Start and enable service
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable pve-exporter
+sudo systemctl start pve-exporter
+
+# Check status
+sudo systemctl status pve-exporter
+
+# View logs
+sudo journalctl -u pve-exporter -f
 ```
 
 ## ⚙️ Configuration
@@ -167,3 +245,4 @@ Contributions are welcome! Please submit a Pull Request.
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE) for details.
+
