@@ -1176,12 +1176,15 @@ func (c *ProxmoxCollector) collectResourceMetrics(ch chan<- prometheus.Metric, n
 
 			labels := []string{node, fmt.Sprintf("%d", vm.VMID), vm.Name}
 
-			// Get detailed status for disk I/O metrics (diskread/diskwrite are only in /status/current)
+			// Get detailed status ONCE for all metrics (disk I/O, balloon, pressure, etc.)
 			diskRead := vm.DiskRead
 			diskWrite := vm.DiskWrite
+			var detailData []byte
 			if vm.Status == "running" {
 				detailPath := fmt.Sprintf("/nodes/%s/%s/%d/status/current", node, resType, vm.VMID)
-				if detailData, err := c.apiRequest(detailPath); err == nil {
+				var err error
+				detailData, err = c.apiRequest(detailPath)
+				if err == nil {
 					var detailResult struct {
 						Data struct {
 							DiskRead  float64 `json:"diskread"`
@@ -1208,8 +1211,8 @@ func (c *ProxmoxCollector) collectResourceMetrics(ch chan<- prometheus.Metric, n
 				ch <- prometheus.MustNewConstMetric(c.lxcNetOut, prometheus.CounterValue, vm.NetOut, labels...)
 				ch <- prometheus.MustNewConstMetric(c.lxcDiskRead, prometheus.CounterValue, diskRead, labels...)
 				ch <- prometheus.MustNewConstMetric(c.lxcDiskWrite, prometheus.CounterValue, diskWrite, labels...)
-				// Get LXC swap from detailed status
-				c.collectLXCSwapMetrics(ch, node, vm.VMID, labels)
+				// Get LXC swap - reuse detailData if available
+				c.collectLXCSwapMetricsFromData(ch, detailData, labels)
 			} else {
 				ch <- prometheus.MustNewConstMetric(c.vmStatus, prometheus.GaugeValue, status, labels...)
 				ch <- prometheus.MustNewConstMetric(c.vmUptime, prometheus.GaugeValue, vm.Uptime, labels...)
@@ -1222,8 +1225,8 @@ func (c *ProxmoxCollector) collectResourceMetrics(ch chan<- prometheus.Metric, n
 				ch <- prometheus.MustNewConstMetric(c.vmNetOut, prometheus.CounterValue, vm.NetOut, labels...)
 				ch <- prometheus.MustNewConstMetric(c.vmDiskRead, prometheus.CounterValue, diskRead, labels...)
 				ch <- prometheus.MustNewConstMetric(c.vmDiskWrite, prometheus.CounterValue, diskWrite, labels...)
-				// Get VM detailed metrics (balloon, freemem, HA)
-				c.collectVMDetailedMetrics(ch, node, vm.VMID, labels)
+				// Get VM detailed metrics - reuse detailData instead of making another API call
+				c.collectVMDetailedMetricsFromData(ch, detailData, labels)
 			}
 		}(vm)
 	}
@@ -1335,6 +1338,14 @@ func (c *ProxmoxCollector) collectLXCSwapMetrics(ch chan<- prometheus.Metric, no
 		log.Printf("Error fetching LXC swap metrics for %d on %s: %v", vmid, node, err)
 		return
 	}
+	c.collectLXCSwapMetricsFromData(ch, data, labels)
+}
+
+// collectLXCSwapMetricsFromData parses LXC swap metrics from already fetched data
+func (c *ProxmoxCollector) collectLXCSwapMetricsFromData(ch chan<- prometheus.Metric, data []byte, labels []string) {
+	if data == nil {
+		return
+	}
 
 	var result struct {
 		Data struct {
@@ -1354,7 +1365,6 @@ func (c *ProxmoxCollector) collectLXCSwapMetrics(ch chan<- prometheus.Metric, no
 	}
 
 	if err := json.Unmarshal(data, &result); err != nil {
-		log.Printf("Error unmarshaling LXC swap metrics for %d on %s: %v", vmid, node, err)
 		return
 	}
 
@@ -1380,6 +1390,97 @@ func (c *ProxmoxCollector) collectLXCSwapMetrics(ch chan<- prometheus.Metric, no
 	}
 	if memSome, err := strconv.ParseFloat(result.Data.PressureMemorySome, 64); err == nil {
 		ch <- prometheus.MustNewConstMetric(c.lxcPressureMemorySome, prometheus.GaugeValue, memSome, labels...)
+	}
+}
+
+// collectVMDetailedMetricsFromData parses VM detailed metrics from already fetched data
+func (c *ProxmoxCollector) collectVMDetailedMetricsFromData(ch chan<- prometheus.Metric, data []byte, labels []string) {
+	if data == nil {
+		return
+	}
+
+	var result struct {
+		Data struct {
+			Balloon float64 `json:"balloon"`
+			FreeMem float64 `json:"freemem"`
+			PID     float64 `json:"pid"`
+			MemHost float64 `json:"memhost"`
+			HA      struct {
+				Managed int `json:"managed"`
+			} `json:"ha"`
+			BalloonInfo struct {
+				Actual          float64 `json:"actual"`
+				MaxMem          float64 `json:"max_mem"`
+				TotalMem        float64 `json:"total_mem"`
+				MajorPageFaults float64 `json:"major_page_faults"`
+				MinorPageFaults float64 `json:"minor_page_faults"`
+				MemSwappedIn    float64 `json:"mem_swapped_in"`
+				MemSwappedOut   float64 `json:"mem_swapped_out"`
+			} `json:"ballooninfo"`
+			PressureCPUFull    float64 `json:"pressurecpufull"`
+			PressureCPUSome    float64 `json:"pressurecpusome"`
+			PressureIOFull     float64 `json:"pressureiofull"`
+			PressureIOSome     float64 `json:"pressureiosome"`
+			PressureMemoryFull float64 `json:"pressurememoryfull"`
+			PressureMemorySome float64 `json:"pressurememorysome"`
+			BlockStat          map[string]struct {
+				RdBytes     float64 `json:"rd_bytes"`
+				WrBytes     float64 `json:"wr_bytes"`
+				RdOps       float64 `json:"rd_operations"`
+				WrOps       float64 `json:"wr_operations"`
+				FailedRdOps float64 `json:"failed_rd_operations"`
+				FailedWrOps float64 `json:"failed_wr_operations"`
+				FlushOps    float64 `json:"flush_operations"`
+			} `json:"blockstat"`
+			NICS map[string]struct {
+				NetIn  float64 `json:"netin"`
+				NetOut float64 `json:"netout"`
+			} `json:"nics"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(data, &result); err != nil {
+		return
+	}
+
+	ch <- prometheus.MustNewConstMetric(c.vmBalloon, prometheus.GaugeValue, result.Data.Balloon, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmFreeMem, prometheus.GaugeValue, result.Data.FreeMem, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmHAManaged, prometheus.GaugeValue, float64(result.Data.HA.Managed), labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmPID, prometheus.GaugeValue, result.Data.PID, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmMemHost, prometheus.GaugeValue, result.Data.MemHost, labels...)
+	// Pressure metrics
+	ch <- prometheus.MustNewConstMetric(c.vmPressureCPUFull, prometheus.GaugeValue, result.Data.PressureCPUFull, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmPressureCPUSome, prometheus.GaugeValue, result.Data.PressureCPUSome, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmPressureIOFull, prometheus.GaugeValue, result.Data.PressureIOFull, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmPressureIOSome, prometheus.GaugeValue, result.Data.PressureIOSome, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmPressureMemoryFull, prometheus.GaugeValue, result.Data.PressureMemoryFull, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmPressureMemorySome, prometheus.GaugeValue, result.Data.PressureMemorySome, labels...)
+	// Balloon info
+	ch <- prometheus.MustNewConstMetric(c.vmBalloonActual, prometheus.GaugeValue, result.Data.BalloonInfo.Actual, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmBalloonMaxMem, prometheus.GaugeValue, result.Data.BalloonInfo.MaxMem, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmBalloonTotalMem, prometheus.GaugeValue, result.Data.BalloonInfo.TotalMem, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmBalloonMajorFaults, prometheus.CounterValue, result.Data.BalloonInfo.MajorPageFaults, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmBalloonMinorFaults, prometheus.CounterValue, result.Data.BalloonInfo.MinorPageFaults, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmBalloonMemSwappedIn, prometheus.GaugeValue, result.Data.BalloonInfo.MemSwappedIn, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmBalloonMemSwappedOut, prometheus.GaugeValue, result.Data.BalloonInfo.MemSwappedOut, labels...)
+
+	// Block device metrics
+	for device, stats := range result.Data.BlockStat {
+		deviceLabels := append(labels, device)
+		ch <- prometheus.MustNewConstMetric(c.vmBlockReadBytes, prometheus.CounterValue, stats.RdBytes, deviceLabels...)
+		ch <- prometheus.MustNewConstMetric(c.vmBlockWriteBytes, prometheus.CounterValue, stats.WrBytes, deviceLabels...)
+		ch <- prometheus.MustNewConstMetric(c.vmBlockReadOps, prometheus.CounterValue, stats.RdOps, deviceLabels...)
+		ch <- prometheus.MustNewConstMetric(c.vmBlockWriteOps, prometheus.CounterValue, stats.WrOps, deviceLabels...)
+		ch <- prometheus.MustNewConstMetric(c.vmBlockFailedRead, prometheus.CounterValue, stats.FailedRdOps, deviceLabels...)
+		ch <- prometheus.MustNewConstMetric(c.vmBlockFailedWrite, prometheus.CounterValue, stats.FailedWrOps, deviceLabels...)
+		ch <- prometheus.MustNewConstMetric(c.vmBlockFlushOps, prometheus.CounterValue, stats.FlushOps, deviceLabels...)
+	}
+
+	// NIC metrics
+	for iface, stats := range result.Data.NICS {
+		nicLabels := append(labels, iface)
+		ch <- prometheus.MustNewConstMetric(c.vmNICNetIn, prometheus.CounterValue, stats.NetIn, nicLabels...)
+		ch <- prometheus.MustNewConstMetric(c.vmNICNetOut, prometheus.CounterValue, stats.NetOut, nicLabels...)
 	}
 }
 
