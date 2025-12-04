@@ -1447,14 +1447,16 @@ func (c *ProxmoxCollector) collectStorageAndBackupMetrics(ch chan<- prometheus.M
 				ch <- prometheus.MustNewConstMetric(c.storageUsedFraction, prometheus.GaugeValue, storage.UsedFraction, labels...)
 
 				// PART 2: Backup content discovery (only for storages with backup content)
-				if !strings.Contains(storage.Content, "backup") {
+				// Also check for PBS type as they always support backups
+				hasBackupContent := strings.Contains(storage.Content, "backup") || storage.Type == "pbs"
+				if !hasBackupContent {
 					continue
 				}
 
 				contentPath := fmt.Sprintf("/nodes/%s/storage/%s/content?content=backup", nodeName, storage.Storage)
 				contentData, err := c.apiRequest(contentPath)
 				if err != nil {
-					// This can happen if PBS is unreachable or storage doesn't support listing
+					log.Printf("Debug: Error fetching backup content from %s on node %s: %v", storage.Storage, nodeName, err)
 					continue
 				}
 
