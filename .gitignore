@@ -1,5 +1,5 @@
 # Binaries
-pve-exporter
+pve-exporter-linux*
 pve-exporter.exe
 *.exe~
 

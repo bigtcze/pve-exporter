@@ -182,7 +182,6 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_vm_cpus` | Number of CPUs allocated |
 | `pve_vm_memory_used_bytes` | Used memory in bytes |
 | `pve_vm_memory_max_bytes` | Total memory in bytes |
-| `pve_vm_disk_used_bytes` | Used disk space in bytes |
 | `pve_vm_disk_max_bytes` | Total disk space in bytes |
 | `pve_vm_network_in_bytes_total` | Network input bytes |
 | `pve_vm_network_out_bytes_total` | Network output bytes |

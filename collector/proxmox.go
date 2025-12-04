@@ -42,7 +42,6 @@ type ProxmoxCollector struct {
 	vmCPUs      *prometheus.Desc
 	vmMemory    *prometheus.Desc
 	vmMaxMemory *prometheus.Desc
-	vmDisk      *prometheus.Desc
 	vmMaxDisk   *prometheus.Desc
 	vmNetIn     *prometheus.Desc
 	vmNetOut    *prometheus.Desc
@@ -180,11 +179,6 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 			"VM maximum memory in bytes",
 			[]string{"node", "vmid", "name"}, nil,
 		),
-		vmDisk: prometheus.NewDesc(
-			"pve_vm_disk_used_bytes",
-			"VM disk usage in bytes",
-			[]string{"node", "vmid", "name"}, nil,
-		),
 		vmMaxDisk: prometheus.NewDesc(
 			"pve_vm_disk_max_bytes",
 			"VM maximum disk in bytes",
@@ -319,7 +313,6 @@ func (c *ProxmoxCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.vmCPUs
 	ch <- c.vmMemory
 	ch <- c.vmMaxMemory
-	ch <- c.vmDisk
 	ch <- c.vmMaxDisk
 	ch <- c.vmNetIn
 	ch <- c.vmNetOut
@@ -554,6 +547,25 @@ func (c *ProxmoxCollector) collectResourceMetrics(ch chan<- prometheus.Metric, n
 
 		labels := []string{node, fmt.Sprintf("%d", vm.VMID), vm.Name}
 
+		// Get detailed status for disk I/O metrics (diskread/diskwrite are only in /status/current)
+		diskRead := vm.DiskRead
+		diskWrite := vm.DiskWrite
+		if vm.Status == "running" {
+			detailPath := fmt.Sprintf("/nodes/%s/%s/%d/status/current", node, resType, vm.VMID)
+			if detailData, err := c.apiRequest(detailPath); err == nil {
+				var detailResult struct {
+					Data struct {
+						DiskRead  float64 `json:"diskread"`
+						DiskWrite float64 `json:"diskwrite"`
+					} `json:"data"`
+				}
+				if err := json.Unmarshal(detailData, &detailResult); err == nil {
+					diskRead = detailResult.Data.DiskRead
+					diskWrite = detailResult.Data.DiskWrite
+				}
+			}
+		}
+
 		if resType == "lxc" {
 			ch <- prometheus.MustNewConstMetric(c.lxcStatus, prometheus.GaugeValue, status, labels...)
 			ch <- prometheus.MustNewConstMetric(c.lxcUptime, prometheus.GaugeValue, vm.Uptime, labels...)
@@ -565,8 +577,8 @@ func (c *ProxmoxCollector) collectResourceMetrics(ch chan<- prometheus.Metric, n
 			ch <- prometheus.MustNewConstMetric(c.lxcMaxDisk, prometheus.GaugeValue, vm.MaxDisk, labels...)
 			ch <- prometheus.MustNewConstMetric(c.lxcNetIn, prometheus.CounterValue, vm.NetIn, labels...)
 			ch <- prometheus.MustNewConstMetric(c.lxcNetOut, prometheus.CounterValue, vm.NetOut, labels...)
-			ch <- prometheus.MustNewConstMetric(c.lxcDiskRead, prometheus.CounterValue, vm.DiskRead, labels...)
-			ch <- prometheus.MustNewConstMetric(c.lxcDiskWrite, prometheus.CounterValue, vm.DiskWrite, labels...)
+			ch <- prometheus.MustNewConstMetric(c.lxcDiskRead, prometheus.CounterValue, diskRead, labels...)
+			ch <- prometheus.MustNewConstMetric(c.lxcDiskWrite, prometheus.CounterValue, diskWrite, labels...)
 		} else {
 			ch <- prometheus.MustNewConstMetric(c.vmStatus, prometheus.GaugeValue, status, labels...)
 			ch <- prometheus.MustNewConstMetric(c.vmUptime, prometheus.GaugeValue, vm.Uptime, labels...)
@@ -574,12 +586,11 @@ func (c *ProxmoxCollector) collectResourceMetrics(ch chan<- prometheus.Metric, n
 			ch <- prometheus.MustNewConstMetric(c.vmCPUs, prometheus.GaugeValue, vm.CPUs, labels...)
 			ch <- prometheus.MustNewConstMetric(c.vmMemory, prometheus.GaugeValue, vm.Mem, labels...)
 			ch <- prometheus.MustNewConstMetric(c.vmMaxMemory, prometheus.GaugeValue, vm.MaxMem, labels...)
-			ch <- prometheus.MustNewConstMetric(c.vmDisk, prometheus.GaugeValue, vm.Disk, labels...)
 			ch <- prometheus.MustNewConstMetric(c.vmMaxDisk, prometheus.GaugeValue, vm.MaxDisk, labels...)
 			ch <- prometheus.MustNewConstMetric(c.vmNetIn, prometheus.CounterValue, vm.NetIn, labels...)
 			ch <- prometheus.MustNewConstMetric(c.vmNetOut, prometheus.CounterValue, vm.NetOut, labels...)
-			ch <- prometheus.MustNewConstMetric(c.vmDiskRead, prometheus.CounterValue, vm.DiskRead, labels...)
-			ch <- prometheus.MustNewConstMetric(c.vmDiskWrite, prometheus.CounterValue, vm.DiskWrite, labels...)
+			ch <- prometheus.MustNewConstMetric(c.vmDiskRead, prometheus.CounterValue, diskRead, labels...)
+			ch <- prometheus.MustNewConstMetric(c.vmDiskWrite, prometheus.CounterValue, diskWrite, labels...)
 		}
 	}
 
