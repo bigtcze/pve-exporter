@@ -18,6 +18,20 @@ A professional Prometheus exporter for Proxmox VE, written in Go. It collects co
 - **Lightweight**: Single static binary, runs as systemd service.
 - **Easy Configuration**: Configure via environment variables or YAML file.
 
+## 📊 Grafana Dashboard
+
+Import the official dashboard from Grafana.com:
+
+[![Grafana Dashboard](https://img.shields.io/badge/Grafana-Dashboard-orange?logo=grafana)](https://grafana.com/grafana/dashboards/24512)
+
+**Dashboard ID:** `24512`
+
+**Import via Grafana UI:**
+1. Go to Dashboards → Import
+2. Enter ID `24512` and click "Load"
+3. Select your Prometheus data source
+4. Click "Import"
+
 ## ⚡ Quick Start
 
 ### Download Binary
