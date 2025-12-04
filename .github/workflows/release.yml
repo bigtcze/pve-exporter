@@ -48,17 +48,22 @@ jobs:
         id: release_notes
         run: |
           TAG_NAME=${GITHUB_REF#refs/tags/}
+          echo "Processing tag: $TAG_NAME"
           
-          # Get subject
-          RELEASE_NAME=$(git tag -l --format='%(contents:subject)' "$TAG_NAME")
+          # Force fetch tags to ensure we have the tag object locally
+          git fetch --tags --force
           
-          # Get body
-          RELEASE_BODY=$(git tag -l --format='%(contents:body)' "$TAG_NAME")
+          # Use for-each-ref for precise extraction of annotated tag content
+          RELEASE_NAME=$(git for-each-ref refs/tags/$TAG_NAME --format='%(contents:subject)')
+          RELEASE_BODY=$(git for-each-ref refs/tags/$TAG_NAME --format='%(contents:body)')
           
-          # If no body, use subject as body too (fallback)
+          # If no body (e.g. lightweight tag or empty body), use subject
           if [ -z "$RELEASE_BODY" ]; then
+             echo "Warning: No release body found. Using subject."
              RELEASE_BODY="$RELEASE_NAME"
           fi
+          
+          echo "Extracted Name: $RELEASE_NAME"
           
           echo "name=$RELEASE_NAME" >> $GITHUB_OUTPUT
           
