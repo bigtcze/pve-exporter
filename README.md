@@ -220,6 +220,15 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_vm_pressure_io_some` | I/O pressure some |
 | `pve_vm_pressure_memory_full` | Memory pressure full |
 | `pve_vm_pressure_memory_some` | Memory pressure some |
+| `pve_vm_block_read_bytes_total` | Block device read bytes (label: device) |
+| `pve_vm_block_write_bytes_total` | Block device write bytes (label: device) |
+| `pve_vm_block_read_ops_total` | Block device read ops (label: device) |
+| `pve_vm_block_write_ops_total` | Block device write ops (label: device) |
+| `pve_vm_block_failed_read_ops_total` | Block device failed read ops (label: device) |
+| `pve_vm_block_failed_write_ops_total` | Block device failed write ops (label: device) |
+| `pve_vm_block_flush_ops_total` | Block device flush ops (label: device) |
+| `pve_vm_nic_in_bytes_total` | NIC input bytes (label: interface) |
+| `pve_vm_nic_out_bytes_total` | NIC output bytes (label: interface) |
 | `pve_guest_last_backup_timestamp_seconds` | Timestamp of the last backup |
 
 ### LXC Metrics (Containers)

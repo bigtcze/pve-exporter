@@ -80,6 +80,17 @@ type ProxmoxCollector struct {
 	vmBalloonMinorFaults   *prometheus.Desc
 	vmBalloonMemSwappedIn  *prometheus.Desc
 	vmBalloonMemSwappedOut *prometheus.Desc
+	// VM block device metrics
+	vmBlockReadBytes   *prometheus.Desc
+	vmBlockWriteBytes  *prometheus.Desc
+	vmBlockReadOps     *prometheus.Desc
+	vmBlockWriteOps    *prometheus.Desc
+	vmBlockFailedRead  *prometheus.Desc
+	vmBlockFailedWrite *prometheus.Desc
+	vmBlockFlushOps    *prometheus.Desc
+	// VM NIC metrics
+	vmNICNetIn  *prometheus.Desc
+	vmNICNetOut *prometheus.Desc
 
 	// LXC metrics
 	lxcStatus    *prometheus.Desc
@@ -405,6 +416,53 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 			"VM memory swapped out",
 			[]string{"node", "vmid", "name"}, nil,
 		),
+		// VM block device metrics
+		vmBlockReadBytes: prometheus.NewDesc(
+			"pve_vm_block_read_bytes_total",
+			"VM block device read in bytes",
+			[]string{"node", "vmid", "name", "device"}, nil,
+		),
+		vmBlockWriteBytes: prometheus.NewDesc(
+			"pve_vm_block_write_bytes_total",
+			"VM block device write in bytes",
+			[]string{"node", "vmid", "name", "device"}, nil,
+		),
+		vmBlockReadOps: prometheus.NewDesc(
+			"pve_vm_block_read_ops_total",
+			"VM block device read operations",
+			[]string{"node", "vmid", "name", "device"}, nil,
+		),
+		vmBlockWriteOps: prometheus.NewDesc(
+			"pve_vm_block_write_ops_total",
+			"VM block device write operations",
+			[]string{"node", "vmid", "name", "device"}, nil,
+		),
+		vmBlockFailedRead: prometheus.NewDesc(
+			"pve_vm_block_failed_read_ops_total",
+			"VM block device failed read operations",
+			[]string{"node", "vmid", "name", "device"}, nil,
+		),
+		vmBlockFailedWrite: prometheus.NewDesc(
+			"pve_vm_block_failed_write_ops_total",
+			"VM block device failed write operations",
+			[]string{"node", "vmid", "name", "device"}, nil,
+		),
+		vmBlockFlushOps: prometheus.NewDesc(
+			"pve_vm_block_flush_ops_total",
+			"VM block device flush operations",
+			[]string{"node", "vmid", "name", "device"}, nil,
+		),
+		// VM NIC metrics
+		vmNICNetIn: prometheus.NewDesc(
+			"pve_vm_nic_in_bytes_total",
+			"VM NIC input in bytes",
+			[]string{"node", "vmid", "name", "interface"}, nil,
+		),
+		vmNICNetOut: prometheus.NewDesc(
+			"pve_vm_nic_out_bytes_total",
+			"VM NIC output in bytes",
+			[]string{"node", "vmid", "name", "interface"}, nil,
+		),
 
 		// LXC metrics
 		lxcStatus: prometheus.NewDesc(
@@ -620,6 +678,15 @@ func (c *ProxmoxCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.vmBalloonMinorFaults
 	ch <- c.vmBalloonMemSwappedIn
 	ch <- c.vmBalloonMemSwappedOut
+	ch <- c.vmBlockReadBytes
+	ch <- c.vmBlockWriteBytes
+	ch <- c.vmBlockReadOps
+	ch <- c.vmBlockWriteOps
+	ch <- c.vmBlockFailedRead
+	ch <- c.vmBlockFailedWrite
+	ch <- c.vmBlockFlushOps
+	ch <- c.vmNICNetIn
+	ch <- c.vmNICNetOut
 	ch <- c.lxcStatus
 	ch <- c.lxcUptime
 	ch <- c.lxcCPU
@@ -1026,6 +1093,19 @@ func (c *ProxmoxCollector) collectVMDetailedMetrics(ch chan<- prometheus.Metric,
 			PressureIOSome     float64 `json:"pressureiosome"`
 			PressureMemoryFull float64 `json:"pressurememoryfull"`
 			PressureMemorySome float64 `json:"pressurememorysome"`
+			BlockStat          map[string]struct {
+				RdBytes     float64 `json:"rd_bytes"`
+				WrBytes     float64 `json:"wr_bytes"`
+				RdOps       float64 `json:"rd_operations"`
+				WrOps       float64 `json:"wr_operations"`
+				FailedRdOps float64 `json:"failed_rd_operations"`
+				FailedWrOps float64 `json:"failed_wr_operations"`
+				FlushOps    float64 `json:"flush_operations"`
+			} `json:"blockstat"`
+			NICS map[string]struct {
+				NetIn  float64 `json:"netin"`
+				NetOut float64 `json:"netout"`
+			} `json:"nics"`
 		} `json:"data"`
 	}
 
@@ -1053,6 +1133,25 @@ func (c *ProxmoxCollector) collectVMDetailedMetrics(ch chan<- prometheus.Metric,
 	ch <- prometheus.MustNewConstMetric(c.vmBalloonMinorFaults, prometheus.CounterValue, result.Data.BalloonInfo.MinorPageFaults, labels...)
 	ch <- prometheus.MustNewConstMetric(c.vmBalloonMemSwappedIn, prometheus.GaugeValue, result.Data.BalloonInfo.MemSwappedIn, labels...)
 	ch <- prometheus.MustNewConstMetric(c.vmBalloonMemSwappedOut, prometheus.GaugeValue, result.Data.BalloonInfo.MemSwappedOut, labels...)
+
+	// Block device metrics
+	for device, stats := range result.Data.BlockStat {
+		deviceLabels := append(labels, device)
+		ch <- prometheus.MustNewConstMetric(c.vmBlockReadBytes, prometheus.CounterValue, stats.RdBytes, deviceLabels...)
+		ch <- prometheus.MustNewConstMetric(c.vmBlockWriteBytes, prometheus.CounterValue, stats.WrBytes, deviceLabels...)
+		ch <- prometheus.MustNewConstMetric(c.vmBlockReadOps, prometheus.CounterValue, stats.RdOps, deviceLabels...)
+		ch <- prometheus.MustNewConstMetric(c.vmBlockWriteOps, prometheus.CounterValue, stats.WrOps, deviceLabels...)
+		ch <- prometheus.MustNewConstMetric(c.vmBlockFailedRead, prometheus.CounterValue, stats.FailedRdOps, deviceLabels...)
+		ch <- prometheus.MustNewConstMetric(c.vmBlockFailedWrite, prometheus.CounterValue, stats.FailedWrOps, deviceLabels...)
+		ch <- prometheus.MustNewConstMetric(c.vmBlockFlushOps, prometheus.CounterValue, stats.FlushOps, deviceLabels...)
+	}
+
+	// NIC metrics
+	for iface, stats := range result.Data.NICS {
+		nicLabels := append(labels, iface)
+		ch <- prometheus.MustNewConstMetric(c.vmNICNetIn, prometheus.CounterValue, stats.NetIn, nicLabels...)
+		ch <- prometheus.MustNewConstMetric(c.vmNICNetOut, prometheus.CounterValue, stats.NetOut, nicLabels...)
+	}
 }
 
 // collectLXCSwapMetrics fetches swap, HA, PID, and pressure metrics for LXC containers
