@@ -178,6 +178,8 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_node_load5` | Load average 5 minutes |
 | `pve_node_load15` | Load average 15 minutes |
 | `pve_node_iowait` | I/O wait ratio |
+| `pve_node_idle` | Idle CPU ratio |
+| `pve_node_cpu_mhz` | CPU frequency in MHz |
 | `pve_node_rootfs_total_bytes` | Root filesystem total size |
 | `pve_node_rootfs_used_bytes` | Root filesystem used |
 | `pve_node_rootfs_free_bytes` | Root filesystem free |
@@ -195,11 +197,14 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_vm_cpus` | Number of CPUs allocated |
 | `pve_vm_memory_used_bytes` | Used memory in bytes |
 | `pve_vm_memory_max_bytes` | Total memory in bytes |
+| `pve_vm_memory_free_bytes` | Free memory (guest agent) |
+| `pve_vm_balloon_bytes` | Balloon target in bytes |
 | `pve_vm_disk_max_bytes` | Total disk space in bytes |
 | `pve_vm_network_in_bytes_total` | Network input bytes |
 | `pve_vm_network_out_bytes_total` | Network output bytes |
 | `pve_vm_disk_read_bytes_total` | Disk read bytes |
 | `pve_vm_disk_write_bytes_total` | Disk write bytes |
+| `pve_vm_ha_managed` | Managed by HA (1=yes) |
 | `pve_guest_last_backup_timestamp_seconds` | Timestamp of the last backup |
 
 ### LXC Metrics (Containers)
@@ -220,6 +225,7 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_lxc_network_out_bytes_total` | Network output bytes |
 | `pve_lxc_disk_read_bytes_total` | Disk read bytes |
 | `pve_lxc_disk_write_bytes_total` | Disk write bytes |
+| `pve_lxc_ha_managed` | Managed by HA (1=yes) |
 | `pve_guest_last_backup_timestamp_seconds` | Timestamp of the last backup |
 
 ### Storage Metrics
@@ -232,6 +238,7 @@ The exporter exposes the following metrics at `/metrics`.
 | `pve_storage_active` | Storage is active (1=yes) |
 | `pve_storage_enabled` | Storage is enabled (1=yes) |
 | `pve_storage_shared` | Storage is shared (1=yes) |
+| `pve_storage_used_fraction` | Used fraction (0.0-1.0) |
 
 ## 🔒 Authentication & Permissions
 

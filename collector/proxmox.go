@@ -21,7 +21,6 @@ type ProxmoxCollector struct {
 	ticket string
 	csrf   string
 	mutex  sync.RWMutex
-
 	// Node metrics
 	nodeUp          *prometheus.Desc
 	nodeUptime      *prometheus.Desc
@@ -40,6 +39,8 @@ type ProxmoxCollector struct {
 	nodeLoad5       *prometheus.Desc
 	nodeLoad15      *prometheus.Desc
 	nodeIOWait      *prometheus.Desc
+	nodeIdle        *prometheus.Desc
+	nodeCPUMhz      *prometheus.Desc
 	nodeRootfsTotal *prometheus.Desc
 	nodeRootfsUsed  *prometheus.Desc
 	nodeRootfsFree  *prometheus.Desc
@@ -54,11 +55,14 @@ type ProxmoxCollector struct {
 	vmCPUs      *prometheus.Desc
 	vmMemory    *prometheus.Desc
 	vmMaxMemory *prometheus.Desc
+	vmFreeMem   *prometheus.Desc
+	vmBalloon   *prometheus.Desc
 	vmMaxDisk   *prometheus.Desc
 	vmNetIn     *prometheus.Desc
 	vmNetOut    *prometheus.Desc
 	vmDiskRead  *prometheus.Desc
 	vmDiskWrite *prometheus.Desc
+	vmHAManaged *prometheus.Desc
 
 	// LXC metrics
 	lxcStatus    *prometheus.Desc
@@ -74,16 +78,18 @@ type ProxmoxCollector struct {
 	lxcDiskRead  *prometheus.Desc
 	lxcDiskWrite *prometheus.Desc
 	// New LXC metrics
-	lxcSwap    *prometheus.Desc
-	lxcMaxSwap *prometheus.Desc
+	lxcSwap      *prometheus.Desc
+	lxcMaxSwap   *prometheus.Desc
+	lxcHAManaged *prometheus.Desc
 
 	// Storage metrics
-	storageTotal   *prometheus.Desc
-	storageUsed    *prometheus.Desc
-	storageAvail   *prometheus.Desc
-	storageActive  *prometheus.Desc
-	storageEnabled *prometheus.Desc
-	storageShared  *prometheus.Desc
+	storageTotal        *prometheus.Desc
+	storageUsed         *prometheus.Desc
+	storageAvail        *prometheus.Desc
+	storageActive       *prometheus.Desc
+	storageEnabled      *prometheus.Desc
+	storageShared       *prometheus.Desc
+	storageUsedFraction *prometheus.Desc
 
 	// Backup metrics
 	guestLastBackup *prometheus.Desc
@@ -186,6 +192,16 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 			"Node I/O wait ratio",
 			[]string{"node"}, nil,
 		),
+		nodeIdle: prometheus.NewDesc(
+			"pve_node_idle",
+			"Node idle CPU ratio",
+			[]string{"node"}, nil,
+		),
+		nodeCPUMhz: prometheus.NewDesc(
+			"pve_node_cpu_mhz",
+			"CPU frequency in MHz",
+			[]string{"node"}, nil,
+		),
 		nodeRootfsTotal: prometheus.NewDesc(
 			"pve_node_rootfs_total_bytes",
 			"Node root filesystem total size in bytes",
@@ -273,6 +289,21 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 			"VM disk write in bytes",
 			[]string{"node", "vmid", "name"}, nil,
 		),
+		vmFreeMem: prometheus.NewDesc(
+			"pve_vm_memory_free_bytes",
+			"VM free memory in bytes (from guest agent/balloon)",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		vmBalloon: prometheus.NewDesc(
+			"pve_vm_balloon_bytes",
+			"VM balloon target in bytes",
+			[]string{"node", "vmid", "name"}, nil,
+		),
+		vmHAManaged: prometheus.NewDesc(
+			"pve_vm_ha_managed",
+			"VM is managed by HA (1=yes, 0=no)",
+			[]string{"node", "vmid", "name"}, nil,
+		),
 
 		// LXC metrics
 		lxcStatus: prometheus.NewDesc(
@@ -345,6 +376,11 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 			"LXC maximum swap in bytes",
 			[]string{"node", "vmid", "name"}, nil,
 		),
+		lxcHAManaged: prometheus.NewDesc(
+			"pve_lxc_ha_managed",
+			"LXC is managed by HA (1=yes, 0=no)",
+			[]string{"node", "vmid", "name"}, nil,
+		),
 
 		// Storage metrics
 		storageTotal: prometheus.NewDesc(
@@ -377,6 +413,11 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 			"Storage is shared (1=shared, 0=local)",
 			[]string{"node", "storage", "type"}, nil,
 		),
+		storageUsedFraction: prometheus.NewDesc(
+			"pve_storage_used_fraction",
+			"Storage used fraction (0.0-1.0)",
+			[]string{"node", "storage", "type"}, nil,
+		),
 
 		// Backup metrics
 		guestLastBackup: prometheus.NewDesc(
@@ -405,6 +446,8 @@ func (c *ProxmoxCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.nodeLoad5
 	ch <- c.nodeLoad15
 	ch <- c.nodeIOWait
+	ch <- c.nodeIdle
+	ch <- c.nodeCPUMhz
 	ch <- c.nodeRootfsTotal
 	ch <- c.nodeRootfsUsed
 	ch <- c.nodeRootfsFree
@@ -417,11 +460,14 @@ func (c *ProxmoxCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.vmCPUs
 	ch <- c.vmMemory
 	ch <- c.vmMaxMemory
+	ch <- c.vmFreeMem
+	ch <- c.vmBalloon
 	ch <- c.vmMaxDisk
 	ch <- c.vmNetIn
 	ch <- c.vmNetOut
 	ch <- c.vmDiskRead
 	ch <- c.vmDiskWrite
+	ch <- c.vmHAManaged
 	ch <- c.lxcStatus
 	ch <- c.lxcUptime
 	ch <- c.lxcCPU
@@ -436,12 +482,14 @@ func (c *ProxmoxCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.lxcDiskWrite
 	ch <- c.lxcSwap
 	ch <- c.lxcMaxSwap
+	ch <- c.lxcHAManaged
 	ch <- c.storageTotal
 	ch <- c.storageUsed
 	ch <- c.storageAvail
 	ch <- c.storageActive
 	ch <- c.storageEnabled
 	ch <- c.storageShared
+	ch <- c.storageUsedFraction
 	ch <- c.guestLastBackup
 }
 
@@ -598,12 +646,14 @@ func (c *ProxmoxCollector) collectNodeDetailedMetrics(ch chan<- prometheus.Metri
 		Data struct {
 			LoadAvg []string `json:"loadavg"`
 			Wait    float64  `json:"wait"`
+			Idle    float64  `json:"idle"`
 			KSM     struct {
 				Shared float64 `json:"shared"`
 			} `json:"ksm"`
 			CPUInfo struct {
 				Cores   float64 `json:"cores"`
 				Sockets float64 `json:"sockets"`
+				Mhz     string  `json:"mhz"`
 			} `json:"cpuinfo"`
 			Rootfs struct {
 				Total float64 `json:"total"`
@@ -635,8 +685,14 @@ func (c *ProxmoxCollector) collectNodeDetailedMetrics(ch chan<- prometheus.Metri
 		}
 	}
 
-	// I/O wait
+	// I/O wait and idle
 	ch <- prometheus.MustNewConstMetric(c.nodeIOWait, prometheus.GaugeValue, result.Data.Wait, nodeName)
+	ch <- prometheus.MustNewConstMetric(c.nodeIdle, prometheus.GaugeValue, result.Data.Idle, nodeName)
+
+	// CPU frequency
+	if mhz, err := strconv.ParseFloat(result.Data.CPUInfo.Mhz, 64); err == nil {
+		ch <- prometheus.MustNewConstMetric(c.nodeCPUMhz, prometheus.GaugeValue, mhz, nodeName)
+	}
 
 	// Root filesystem
 	ch <- prometheus.MustNewConstMetric(c.nodeRootfsTotal, prometheus.GaugeValue, result.Data.Rootfs.Total, nodeName)
@@ -771,13 +827,42 @@ func (c *ProxmoxCollector) collectResourceMetrics(ch chan<- prometheus.Metric, n
 			ch <- prometheus.MustNewConstMetric(c.vmNetOut, prometheus.CounterValue, vm.NetOut, labels...)
 			ch <- prometheus.MustNewConstMetric(c.vmDiskRead, prometheus.CounterValue, diskRead, labels...)
 			ch <- prometheus.MustNewConstMetric(c.vmDiskWrite, prometheus.CounterValue, diskWrite, labels...)
+			// Get VM detailed metrics (balloon, freemem, HA)
+			c.collectVMDetailedMetrics(ch, node, vm.VMID, labels)
 		}
 	}
 
 	return len(result.Data)
 }
 
-// collectLXCSwapMetrics fetches swap metrics for LXC containers
+// collectVMDetailedMetrics fetches detailed VM metrics (balloon, freemem, HA)
+func (c *ProxmoxCollector) collectVMDetailedMetrics(ch chan<- prometheus.Metric, node string, vmid int64, labels []string) {
+	path := fmt.Sprintf("/nodes/%s/qemu/%d/status/current", node, vmid)
+	data, err := c.apiRequest(path)
+	if err != nil {
+		return
+	}
+
+	var result struct {
+		Data struct {
+			Balloon float64 `json:"balloon"`
+			FreeMem float64 `json:"freemem"`
+			HA      struct {
+				Managed int `json:"managed"`
+			} `json:"ha"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(data, &result); err != nil {
+		return
+	}
+
+	ch <- prometheus.MustNewConstMetric(c.vmBalloon, prometheus.GaugeValue, result.Data.Balloon, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmFreeMem, prometheus.GaugeValue, result.Data.FreeMem, labels...)
+	ch <- prometheus.MustNewConstMetric(c.vmHAManaged, prometheus.GaugeValue, float64(result.Data.HA.Managed), labels...)
+}
+
+// collectLXCSwapMetrics fetches swap and HA metrics for LXC containers
 func (c *ProxmoxCollector) collectLXCSwapMetrics(ch chan<- prometheus.Metric, node string, vmid int64, labels []string) {
 	path := fmt.Sprintf("/nodes/%s/lxc/%d/status/current", node, vmid)
 	data, err := c.apiRequest(path)
@@ -789,6 +874,9 @@ func (c *ProxmoxCollector) collectLXCSwapMetrics(ch chan<- prometheus.Metric, no
 		Data struct {
 			Swap    float64 `json:"swap"`
 			MaxSwap float64 `json:"maxswap"`
+			HA      struct {
+				Managed int `json:"managed"`
+			} `json:"ha"`
 		} `json:"data"`
 	}
 
@@ -798,6 +886,7 @@ func (c *ProxmoxCollector) collectLXCSwapMetrics(ch chan<- prometheus.Metric, no
 
 	ch <- prometheus.MustNewConstMetric(c.lxcSwap, prometheus.GaugeValue, result.Data.Swap, labels...)
 	ch <- prometheus.MustNewConstMetric(c.lxcMaxSwap, prometheus.GaugeValue, result.Data.MaxSwap, labels...)
+	ch <- prometheus.MustNewConstMetric(c.lxcHAManaged, prometheus.GaugeValue, float64(result.Data.HA.Managed), labels...)
 }
 
 // collectStorageMetrics collects storage metrics
@@ -827,14 +916,15 @@ func (c *ProxmoxCollector) collectStorageMetrics(ch chan<- prometheus.Metric) {
 
 		var result struct {
 			Data []struct {
-				Storage string  `json:"storage"`
-				Type    string  `json:"type"`
-				Total   float64 `json:"total"`
-				Used    float64 `json:"used"`
-				Avail   float64 `json:"avail"`
-				Active  int     `json:"active"`
-				Enabled int     `json:"enabled"`
-				Shared  int     `json:"shared"`
+				Storage      string  `json:"storage"`
+				Type         string  `json:"type"`
+				Total        float64 `json:"total"`
+				Used         float64 `json:"used"`
+				Avail        float64 `json:"avail"`
+				Active       int     `json:"active"`
+				Enabled      int     `json:"enabled"`
+				Shared       int     `json:"shared"`
+				UsedFraction float64 `json:"used_fraction"`
 			} `json:"data"`
 		}
 
@@ -850,6 +940,7 @@ func (c *ProxmoxCollector) collectStorageMetrics(ch chan<- prometheus.Metric) {
 			ch <- prometheus.MustNewConstMetric(c.storageActive, prometheus.GaugeValue, float64(storage.Active), labels...)
 			ch <- prometheus.MustNewConstMetric(c.storageEnabled, prometheus.GaugeValue, float64(storage.Enabled), labels...)
 			ch <- prometheus.MustNewConstMetric(c.storageShared, prometheus.GaugeValue, float64(storage.Shared), labels...)
+			ch <- prometheus.MustNewConstMetric(c.storageUsedFraction, prometheus.GaugeValue, storage.UsedFraction, labels...)
 		}
 	}
 }
