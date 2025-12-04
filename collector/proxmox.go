@@ -845,20 +845,37 @@ func (c *ProxmoxCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	// Collect node metrics
-	c.collectNodeMetrics(ch)
+	// Run all collection functions in parallel for better performance
+	var wg sync.WaitGroup
 
-	// Collect VM/Container metrics
-	c.collectVMMetrics(ch)
+	wg.Add(5)
 
-	// Collect storage metrics
-	c.collectStorageMetrics(ch)
+	go func() {
+		defer wg.Done()
+		c.collectNodeMetrics(ch)
+	}()
 
-	// Collect backup metrics
-	c.collectBackupMetrics(ch)
+	go func() {
+		defer wg.Done()
+		c.collectVMMetrics(ch)
+	}()
 
-	// Collect ZFS metrics
-	c.collectZFSMetrics(ch)
+	go func() {
+		defer wg.Done()
+		c.collectStorageMetrics(ch)
+	}()
+
+	go func() {
+		defer wg.Done()
+		c.collectBackupMetrics(ch)
+	}()
+
+	go func() {
+		defer wg.Done()
+		c.collectZFSMetrics(ch)
+	}()
+
+	wg.Wait()
 }
 
 // authenticate authenticates with Proxmox API
