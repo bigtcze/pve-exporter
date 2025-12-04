@@ -10,9 +10,10 @@ To ensure release notes are correctly populated in GitHub Releases, follow this 
 
 2.  **Deploy & Verify on Test Server**
     - Build linux binary: `$env:GOOS='linux'; $env:GOARCH='amd64'; go build -o pve-exporter-linux-amd64 .`
-    - Copy to test server: `pscp -batch pve-exporter-linux-amd64 root@<TEST_SERVER_IP>:/root/`
+    - Copy to test server: `pscp -batch pve-exporter-linux-amd64 root@<TEST_SERVER_IP>:/usr/local/bin/pve-exporter`
       *(See `~/.gemini/pve-exporter-secrets.md` for actual IP)*
-    - Run and verify metrics (especially new ones): `./pve-exporter-linux-amd64 -config config.yml`
+    - Restart service: `ssh root@<TEST_SERVER_IP> "systemctl restart pve-exporter"`
+    - Verify metrics: `curl http://<TEST_SERVER_IP>:9221/metrics | grep <new_metric>`
 
 3.  **Tag Release**: Create an **annotated tag** with the changelog in the message body.
     *   The **Subject** (first line) will be the Release Title.
