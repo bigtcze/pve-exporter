@@ -1146,65 +1146,89 @@ func (c *ProxmoxCollector) collectResourceMetrics(ch chan<- prometheus.Metric, n
 		return 0
 	}
 
+	// Process VMs in parallel for better performance
+	var wg sync.WaitGroup
+
 	for _, vm := range result.Data {
-		status := 0.0
-		if vm.Status == "running" {
-			status = 1.0
-		}
+		wg.Add(1)
+		go func(vm struct {
+			VMID      int64   `json:"vmid"`
+			Name      string  `json:"name"`
+			Status    string  `json:"status"`
+			Uptime    float64 `json:"uptime"`
+			CPU       float64 `json:"cpu"`
+			CPUs      float64 `json:"cpus"`
+			Mem       float64 `json:"mem"`
+			MaxMem    float64 `json:"maxmem"`
+			Disk      float64 `json:"disk"`
+			MaxDisk   float64 `json:"maxdisk"`
+			NetIn     float64 `json:"netin"`
+			NetOut    float64 `json:"netout"`
+			DiskRead  float64 `json:"diskread"`
+			DiskWrite float64 `json:"diskwrite"`
+		}) {
+			defer wg.Done()
 
-		labels := []string{node, fmt.Sprintf("%d", vm.VMID), vm.Name}
+			status := 0.0
+			if vm.Status == "running" {
+				status = 1.0
+			}
 
-		// Get detailed status for disk I/O metrics (diskread/diskwrite are only in /status/current)
-		diskRead := vm.DiskRead
-		diskWrite := vm.DiskWrite
-		if vm.Status == "running" {
-			detailPath := fmt.Sprintf("/nodes/%s/%s/%d/status/current", node, resType, vm.VMID)
-			if detailData, err := c.apiRequest(detailPath); err == nil {
-				var detailResult struct {
-					Data struct {
-						DiskRead  float64 `json:"diskread"`
-						DiskWrite float64 `json:"diskwrite"`
-					} `json:"data"`
-				}
-				if err := json.Unmarshal(detailData, &detailResult); err == nil {
-					diskRead = detailResult.Data.DiskRead
-					diskWrite = detailResult.Data.DiskWrite
+			labels := []string{node, fmt.Sprintf("%d", vm.VMID), vm.Name}
+
+			// Get detailed status for disk I/O metrics (diskread/diskwrite are only in /status/current)
+			diskRead := vm.DiskRead
+			diskWrite := vm.DiskWrite
+			if vm.Status == "running" {
+				detailPath := fmt.Sprintf("/nodes/%s/%s/%d/status/current", node, resType, vm.VMID)
+				if detailData, err := c.apiRequest(detailPath); err == nil {
+					var detailResult struct {
+						Data struct {
+							DiskRead  float64 `json:"diskread"`
+							DiskWrite float64 `json:"diskwrite"`
+						} `json:"data"`
+					}
+					if err := json.Unmarshal(detailData, &detailResult); err == nil {
+						diskRead = detailResult.Data.DiskRead
+						diskWrite = detailResult.Data.DiskWrite
+					}
 				}
 			}
-		}
 
-		if resType == "lxc" {
-			ch <- prometheus.MustNewConstMetric(c.lxcStatus, prometheus.GaugeValue, status, labels...)
-			ch <- prometheus.MustNewConstMetric(c.lxcUptime, prometheus.GaugeValue, vm.Uptime, labels...)
-			ch <- prometheus.MustNewConstMetric(c.lxcCPU, prometheus.GaugeValue, vm.CPU, labels...)
-			ch <- prometheus.MustNewConstMetric(c.lxcCPUs, prometheus.GaugeValue, vm.CPUs, labels...)
-			ch <- prometheus.MustNewConstMetric(c.lxcMemory, prometheus.GaugeValue, vm.Mem, labels...)
-			ch <- prometheus.MustNewConstMetric(c.lxcMaxMemory, prometheus.GaugeValue, vm.MaxMem, labels...)
-			ch <- prometheus.MustNewConstMetric(c.lxcDisk, prometheus.GaugeValue, vm.Disk, labels...)
-			ch <- prometheus.MustNewConstMetric(c.lxcMaxDisk, prometheus.GaugeValue, vm.MaxDisk, labels...)
-			ch <- prometheus.MustNewConstMetric(c.lxcNetIn, prometheus.CounterValue, vm.NetIn, labels...)
-			ch <- prometheus.MustNewConstMetric(c.lxcNetOut, prometheus.CounterValue, vm.NetOut, labels...)
-			ch <- prometheus.MustNewConstMetric(c.lxcDiskRead, prometheus.CounterValue, diskRead, labels...)
-			ch <- prometheus.MustNewConstMetric(c.lxcDiskWrite, prometheus.CounterValue, diskWrite, labels...)
-			// Get LXC swap from detailed status
-			c.collectLXCSwapMetrics(ch, node, vm.VMID, labels)
-		} else {
-			ch <- prometheus.MustNewConstMetric(c.vmStatus, prometheus.GaugeValue, status, labels...)
-			ch <- prometheus.MustNewConstMetric(c.vmUptime, prometheus.GaugeValue, vm.Uptime, labels...)
-			ch <- prometheus.MustNewConstMetric(c.vmCPU, prometheus.GaugeValue, vm.CPU, labels...)
-			ch <- prometheus.MustNewConstMetric(c.vmCPUs, prometheus.GaugeValue, vm.CPUs, labels...)
-			ch <- prometheus.MustNewConstMetric(c.vmMemory, prometheus.GaugeValue, vm.Mem, labels...)
-			ch <- prometheus.MustNewConstMetric(c.vmMaxMemory, prometheus.GaugeValue, vm.MaxMem, labels...)
-			ch <- prometheus.MustNewConstMetric(c.vmMaxDisk, prometheus.GaugeValue, vm.MaxDisk, labels...)
-			ch <- prometheus.MustNewConstMetric(c.vmNetIn, prometheus.CounterValue, vm.NetIn, labels...)
-			ch <- prometheus.MustNewConstMetric(c.vmNetOut, prometheus.CounterValue, vm.NetOut, labels...)
-			ch <- prometheus.MustNewConstMetric(c.vmDiskRead, prometheus.CounterValue, diskRead, labels...)
-			ch <- prometheus.MustNewConstMetric(c.vmDiskWrite, prometheus.CounterValue, diskWrite, labels...)
-			// Get VM detailed metrics (balloon, freemem, HA)
-			c.collectVMDetailedMetrics(ch, node, vm.VMID, labels)
-		}
+			if resType == "lxc" {
+				ch <- prometheus.MustNewConstMetric(c.lxcStatus, prometheus.GaugeValue, status, labels...)
+				ch <- prometheus.MustNewConstMetric(c.lxcUptime, prometheus.GaugeValue, vm.Uptime, labels...)
+				ch <- prometheus.MustNewConstMetric(c.lxcCPU, prometheus.GaugeValue, vm.CPU, labels...)
+				ch <- prometheus.MustNewConstMetric(c.lxcCPUs, prometheus.GaugeValue, vm.CPUs, labels...)
+				ch <- prometheus.MustNewConstMetric(c.lxcMemory, prometheus.GaugeValue, vm.Mem, labels...)
+				ch <- prometheus.MustNewConstMetric(c.lxcMaxMemory, prometheus.GaugeValue, vm.MaxMem, labels...)
+				ch <- prometheus.MustNewConstMetric(c.lxcDisk, prometheus.GaugeValue, vm.Disk, labels...)
+				ch <- prometheus.MustNewConstMetric(c.lxcMaxDisk, prometheus.GaugeValue, vm.MaxDisk, labels...)
+				ch <- prometheus.MustNewConstMetric(c.lxcNetIn, prometheus.CounterValue, vm.NetIn, labels...)
+				ch <- prometheus.MustNewConstMetric(c.lxcNetOut, prometheus.CounterValue, vm.NetOut, labels...)
+				ch <- prometheus.MustNewConstMetric(c.lxcDiskRead, prometheus.CounterValue, diskRead, labels...)
+				ch <- prometheus.MustNewConstMetric(c.lxcDiskWrite, prometheus.CounterValue, diskWrite, labels...)
+				// Get LXC swap from detailed status
+				c.collectLXCSwapMetrics(ch, node, vm.VMID, labels)
+			} else {
+				ch <- prometheus.MustNewConstMetric(c.vmStatus, prometheus.GaugeValue, status, labels...)
+				ch <- prometheus.MustNewConstMetric(c.vmUptime, prometheus.GaugeValue, vm.Uptime, labels...)
+				ch <- prometheus.MustNewConstMetric(c.vmCPU, prometheus.GaugeValue, vm.CPU, labels...)
+				ch <- prometheus.MustNewConstMetric(c.vmCPUs, prometheus.GaugeValue, vm.CPUs, labels...)
+				ch <- prometheus.MustNewConstMetric(c.vmMemory, prometheus.GaugeValue, vm.Mem, labels...)
+				ch <- prometheus.MustNewConstMetric(c.vmMaxMemory, prometheus.GaugeValue, vm.MaxMem, labels...)
+				ch <- prometheus.MustNewConstMetric(c.vmMaxDisk, prometheus.GaugeValue, vm.MaxDisk, labels...)
+				ch <- prometheus.MustNewConstMetric(c.vmNetIn, prometheus.CounterValue, vm.NetIn, labels...)
+				ch <- prometheus.MustNewConstMetric(c.vmNetOut, prometheus.CounterValue, vm.NetOut, labels...)
+				ch <- prometheus.MustNewConstMetric(c.vmDiskRead, prometheus.CounterValue, diskRead, labels...)
+				ch <- prometheus.MustNewConstMetric(c.vmDiskWrite, prometheus.CounterValue, diskWrite, labels...)
+				// Get VM detailed metrics (balloon, freemem, HA)
+				c.collectVMDetailedMetrics(ch, node, vm.VMID, labels)
+			}
+		}(vm)
 	}
 
+	wg.Wait()
 	return len(result.Data)
 }
 
