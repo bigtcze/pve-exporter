@@ -61,15 +61,15 @@ For production use, install the exporter as a systemd service running under a de
 sudo useradd --system --no-create-home --shell /usr/sbin/nologin pve-exporter
 ```
 
-### 2. Configure permissions for disk metrics (optional)
+### 2. Configure sudo for disk metrics (optional)
 
-For disk SMART metrics, smartctl requires raw disk access. Use `setcap` to grant capabilities without sudo (no logging):
+For disk SMART metrics, smartctl requires root access. The `NOPASSWD` allows passwordless execution, `!syslog` suppresses syslog entries for frequent calls:
 
 ```bash
-sudo setcap cap_sys_rawio+ep /usr/sbin/smartctl
+echo 'Defaults:pve-exporter !syslog' | sudo tee /etc/sudoers.d/pve-exporter
+echo 'pve-exporter ALL=(root) NOPASSWD: /usr/sbin/smartctl' | sudo tee -a /etc/sudoers.d/pve-exporter
+sudo chmod 0440 /etc/sudoers.d/pve-exporter
 ```
-
-> **Note**: This must be re-applied after smartmontools package updates.
 
 ### 3. Install binary
 
