@@ -1062,7 +1062,6 @@ func (c *ProxmoxCollector) collectNodeMetricsWithNodes(ch chan<- prometheus.Metr
 			Status  string  `json:"status"`
 			Uptime  float64 `json:"uptime"`
 			CPU     float64 `json:"cpu"`
-			CPUs    float64 `json:"cpus"`
 			MaxCPU  float64 `json:"maxcpu"`
 			Mem     float64 `json:"mem"`
 			MaxMem  float64 `json:"maxmem"`
@@ -1087,7 +1086,7 @@ func (c *ProxmoxCollector) collectNodeMetricsWithNodes(ch chan<- prometheus.Metr
 		ch <- prometheus.MustNewConstMetric(c.nodeUp, prometheus.GaugeValue, up, node.Node)
 		ch <- prometheus.MustNewConstMetric(c.nodeUptime, prometheus.GaugeValue, node.Uptime, node.Node)
 		ch <- prometheus.MustNewConstMetric(c.nodeCPULoad, prometheus.GaugeValue, node.CPU, node.Node)
-		ch <- prometheus.MustNewConstMetric(c.nodeCPUs, prometheus.GaugeValue, node.CPUs, node.Node)
+		ch <- prometheus.MustNewConstMetric(c.nodeCPUs, prometheus.GaugeValue, node.MaxCPU, node.Node)
 		ch <- prometheus.MustNewConstMetric(c.nodeMemoryTotal, prometheus.GaugeValue, node.MaxMem, node.Node)
 		ch <- prometheus.MustNewConstMetric(c.nodeMemoryUsed, prometheus.GaugeValue, node.Mem, node.Node)
 		ch <- prometheus.MustNewConstMetric(c.nodeMemoryFree, prometheus.GaugeValue, node.MaxMem-node.Mem, node.Node)
