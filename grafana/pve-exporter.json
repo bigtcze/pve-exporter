@@ -3347,7 +3347,7 @@
                     },
                     "targets": [
                         {
-                            "expr": "increase(pve_disk_data_written_bytes{node=~\"$node.*\"}[$__range])",
+                            "expr": "increase(pve_disk_write_bytes_total{node=~\"$node.*\"}[$__range])",
                             "format": "table",
                             "instant": true,
                             "legendFormat": "",
