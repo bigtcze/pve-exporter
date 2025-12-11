@@ -8,11 +8,20 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/bigtcze/pve-exporter/config"
 	"github.com/prometheus/client_golang/prometheus"
+)
+
+// Pre-compiled regex patterns for backup log parsing (optimization: compile once, not per scrape)
+var (
+	backupFinishedRe = regexp.MustCompile(`Finished Backup of VM (\d+)`)
+	backupTimeRe     = regexp.MustCompile(`Backup finished at (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})`)
 )
 
 // ProxmoxCollector collects metrics from Proxmox VE API
@@ -171,6 +180,13 @@ type ProxmoxCollector struct {
 	lxcLastBackup *prometheus.Desc
 }
 
+// GuestInfo represents VM or LXC container info for sharing between collectors
+type GuestInfo struct {
+	Node string
+	Name string
+	Type string // "qemu" or "lxc"
+}
+
 // NewProxmoxCollector creates a new Proxmox collector
 func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 	client := &http.Client{
@@ -179,6 +195,10 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: cfg.InsecureSkipVerify,
 			},
+			// Connection pooling for better performance
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 10,
+			IdleConnTimeout:     90 * time.Second,
 		},
 	}
 
@@ -1001,6 +1021,28 @@ func (c *ProxmoxCollector) Collect(ch chan<- prometheus.Metric) {
 		nodes[i] = n.Node
 	}
 
+	// OPTIMIZATION #6: Fetch all guests ONCE using /cluster/resources (single API call)
+	// This replaces N×2 per-node calls (/qemu + /lxc per node)
+	guests := make(map[string]GuestInfo)
+	resourcesData, err := c.apiRequest("/cluster/resources?type=vm")
+	if err == nil {
+		var resourcesResult struct {
+			Data []struct {
+				VMID   int64  `json:"vmid"`
+				Node   string `json:"node"`
+				Name   string `json:"name"`
+				Type   string `json:"type"` // "qemu" or "lxc"
+				Status string `json:"status"`
+			} `json:"data"`
+		}
+		if json.Unmarshal(resourcesData, &resourcesResult) == nil {
+			for _, res := range resourcesResult.Data {
+				vmid := strconv.FormatInt(res.VMID, 10)
+				guests[vmid] = GuestInfo{Node: res.Node, Name: res.Name, Type: res.Type}
+			}
+		}
+	}
+
 	// Run all collection functions in parallel for better performance
 	var wg sync.WaitGroup
 
@@ -1038,7 +1080,8 @@ func (c *ProxmoxCollector) Collect(ch chan<- prometheus.Metric) {
 
 	go func() {
 		defer wg.Done()
-		c.collectBackupMetrics(ch, nodes)
+		// OPTIMIZATION #2: Pass pre-fetched guest data to avoid duplicate API calls
+		c.collectBackupMetricsWithGuests(ch, nodes, guests)
 	}()
 
 	wg.Wait()
@@ -1581,79 +1624,79 @@ func (c *ProxmoxCollector) collectStorageMetrics(ch chan<- prometheus.Metric, no
 	wg.Wait()
 }
 
-// collectBackupMetrics collects last backup timestamps for VMs and LXC containers
-func (c *ProxmoxCollector) collectBackupMetrics(ch chan<- prometheus.Metric, nodes []string) {
-	// First, collect all VMs and LXCs with their names for label correlation
-	type guestInfo struct {
-		Node string
-		Name string
-		Type string // "qemu" or "lxc"
+// collectBackupMetricsWithGuests collects last backup timestamps for VMs and LXC containers
+// OPTIMIZATION #2: Uses pre-fetched guest data from /cluster/resources to avoid duplicate API calls
+// Also optimized with: parallel log fetches, early exit, dynamic log limits
+func (c *ProxmoxCollector) collectBackupMetricsWithGuests(ch chan<- prometheus.Metric, nodes []string, guests map[string]GuestInfo) {
+	// If no guests were passed (API failed), fall back to fetching ourselves
+	if len(guests) == 0 {
+		var guestsMutex sync.Mutex
+		var wg sync.WaitGroup
+		for _, node := range nodes {
+			wg.Add(1)
+			go func(nodeName string) {
+				defer wg.Done()
+				vmData, err := c.apiRequest(fmt.Sprintf("/nodes/%s/qemu", nodeName))
+				if err == nil {
+					var vmResult struct {
+						Data []struct {
+							VMID int64  `json:"vmid"`
+							Name string `json:"name"`
+						} `json:"data"`
+					}
+					if json.Unmarshal(vmData, &vmResult) == nil {
+						guestsMutex.Lock()
+						for _, vm := range vmResult.Data {
+							vmid := strconv.FormatInt(vm.VMID, 10)
+							guests[vmid] = GuestInfo{Node: nodeName, Name: vm.Name, Type: "qemu"}
+						}
+						guestsMutex.Unlock()
+					}
+				}
+				lxcData, err := c.apiRequest(fmt.Sprintf("/nodes/%s/lxc", nodeName))
+				if err == nil {
+					var lxcResult struct {
+						Data []struct {
+							VMID int64  `json:"vmid"`
+							Name string `json:"name"`
+						} `json:"data"`
+					}
+					if json.Unmarshal(lxcData, &lxcResult) == nil {
+						guestsMutex.Lock()
+						for _, lxc := range lxcResult.Data {
+							vmid := strconv.FormatInt(lxc.VMID, 10)
+							guests[vmid] = GuestInfo{Node: nodeName, Name: lxc.Name, Type: "lxc"}
+						}
+						guestsMutex.Unlock()
+					}
+				}
+			}(node)
+		}
+		wg.Wait()
 	}
-	guests := make(map[string]guestInfo) // key: vmid string
-	var guestsMutex sync.Mutex
+
+	// Now collect backup tasks and find latest successful backup per VMID
+	backups := make(map[string]int64) // key: vmid, value: endtime timestamp
+	var backupsMutex sync.Mutex
+
+	// Count total guests for early exit optimization
+	totalGuests := len(guests)
 
 	var wg sync.WaitGroup
 	for _, node := range nodes {
 		wg.Add(1)
 		go func(nodeName string) {
 			defer wg.Done()
-			// Fetch VMs
-			vmData, err := c.apiRequest(fmt.Sprintf("/nodes/%s/qemu", nodeName))
-			if err == nil {
-				var vmResult struct {
-					Data []struct {
-						VMID int64  `json:"vmid"`
-						Name string `json:"name"`
-					} `json:"data"`
-				}
-				if json.Unmarshal(vmData, &vmResult) == nil {
-					guestsMutex.Lock()
-					for _, vm := range vmResult.Data {
-						vmid := strconv.FormatInt(vm.VMID, 10)
-						guests[vmid] = guestInfo{Node: nodeName, Name: vm.Name, Type: "qemu"}
-					}
-					guestsMutex.Unlock()
-				}
-			}
-			// Fetch LXCs
-			lxcData, err := c.apiRequest(fmt.Sprintf("/nodes/%s/lxc", nodeName))
-			if err == nil {
-				var lxcResult struct {
-					Data []struct {
-						VMID int64  `json:"vmid"`
-						Name string `json:"name"`
-					} `json:"data"`
-				}
-				if json.Unmarshal(lxcData, &lxcResult) == nil {
-					guestsMutex.Lock()
-					for _, lxc := range lxcResult.Data {
-						vmid := strconv.FormatInt(lxc.VMID, 10)
-						guests[vmid] = guestInfo{Node: nodeName, Name: lxc.Name, Type: "lxc"}
-					}
-					guestsMutex.Unlock()
-				}
-			}
-		}(node)
-	}
-	wg.Wait()
-
-	// Now collect backup tasks and find latest successful backup per VMID
-	backups := make(map[string]int64) // key: vmid, value: endtime timestamp
-	var backupsMutex sync.Mutex
-
-	for _, node := range nodes {
-		wg.Add(1)
-		go func(nodeName string) {
-			defer wg.Done()
-			// Fetch vzdump tasks (limit 500 to get enough history)
-			tasksData, err := c.apiRequest(fmt.Sprintf("/nodes/%s/tasks?typefilter=vzdump&limit=500", nodeName))
+			// Fetch vzdump tasks (limit 50 - recent backups are most relevant)
+			tasksData, err := c.apiRequest(fmt.Sprintf("/nodes/%s/tasks?typefilter=vzdump&limit=50", nodeName))
 			if err != nil {
 				return
 			}
 
 			var tasksResult struct {
 				Data []struct {
-					ID        string `json:"id"`      // VMID as string
+					ID        string `json:"id"`      // VMID as string (empty for batch jobs)
+					UPID      string `json:"upid"`    // Unique task ID
 					EndTime   int64  `json:"endtime"` // Unix timestamp
 					Status    string `json:"status"`  // "OK" for successful
 					StartTime int64  `json:"starttime"`
@@ -1664,18 +1707,103 @@ func (c *ProxmoxCollector) collectBackupMetrics(ch chan<- prometheus.Metric, nod
 				return
 			}
 
+			// Collect batch jobs to process in parallel later
+			type batchJob struct {
+				UPID    string
+				EndTime int64
+			}
+			var batchJobs []batchJob
+			const maxBatchLogFetches = 5
+
+			// First pass: collect single VM backups (fast) and identify batch jobs
 			backupsMutex.Lock()
 			for _, task := range tasksResult.Data {
-				// Only count successful backups
-				if task.Status != "OK" || task.ID == "" {
+				if task.Status != "OK" {
 					continue
 				}
-				// Keep only the latest backup per VMID
-				if existing, ok := backups[task.ID]; !ok || task.EndTime > existing {
-					backups[task.ID] = task.EndTime
+				if task.ID != "" {
+					// Single VM backup - use task data directly (fast path)
+					if existing, ok := backups[task.ID]; !ok || task.EndTime > existing {
+						backups[task.ID] = task.EndTime
+					}
+				} else if task.UPID != "" && len(batchJobs) < maxBatchLogFetches {
+					batchJobs = append(batchJobs, batchJob{UPID: task.UPID, EndTime: task.EndTime})
 				}
 			}
 			backupsMutex.Unlock()
+
+			// OPTIMIZATION: Parallel batch log fetches (mutex released during API calls)
+			if len(batchJobs) > 0 {
+				var batchWg sync.WaitGroup
+				localBackups := make(map[string]int64)
+				var localMutex sync.Mutex
+
+				for _, job := range batchJobs {
+					batchWg.Add(1)
+					go func(upid string) {
+						defer batchWg.Done()
+
+						// Dynamic log limit based on guest count (20 lines per guest, min 200)
+						logLimit := totalGuests * 20
+						if logLimit < 200 {
+							logLimit = 200
+						}
+
+						logData, err := c.apiRequest(fmt.Sprintf("/nodes/%s/tasks/%s/log?limit=%d", nodeName, url.PathEscape(upid), logLimit))
+						if err != nil {
+							return
+						}
+
+						var logResult struct {
+							Data []struct {
+								N int    `json:"n"`
+								T string `json:"t"`
+							} `json:"data"`
+						}
+
+						if json.Unmarshal(logData, &logResult) != nil {
+							return
+						}
+
+						// Parse log lines to find finished backups and their times
+						var currentVMID string
+						foundCount := 0
+						for _, line := range logResult.Data {
+							if match := backupFinishedRe.FindStringSubmatch(line.T); match != nil {
+								currentVMID = match[1]
+							} else if currentVMID != "" && strings.Contains(line.T, "Backup finished at") {
+								if match := backupTimeRe.FindStringSubmatch(line.T); match != nil {
+									if t, err := time.Parse("2006-01-02 15:04:05", match[1]); err == nil {
+										timestamp := t.Unix()
+										localMutex.Lock()
+										if existing, ok := localBackups[currentVMID]; !ok || timestamp > existing {
+											localBackups[currentVMID] = timestamp
+											foundCount++
+										}
+										localMutex.Unlock()
+									}
+								}
+								currentVMID = ""
+
+								// OPTIMIZATION: Early exit if we found enough backups
+								if foundCount >= totalGuests {
+									break
+								}
+							}
+						}
+					}(job.UPID)
+				}
+				batchWg.Wait()
+
+				// Merge local results into global backups map
+				backupsMutex.Lock()
+				for vmid, ts := range localBackups {
+					if existing, ok := backups[vmid]; !ok || ts > existing {
+						backups[vmid] = ts
+					}
+				}
+				backupsMutex.Unlock()
+			}
 		}(node)
 	}
 	wg.Wait()

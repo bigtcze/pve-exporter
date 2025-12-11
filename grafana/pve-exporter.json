@@ -1018,6 +1018,44 @@
                                         "value": "s"
                                     }
                                 ]
+                            },
+                            {
+                                "matcher": {
+                                    "id": "byName",
+                                    "options": "Last Backup"
+                                },
+                                "properties": [
+                                    {
+                                        "id": "unit",
+                                        "value": "s"
+                                    },
+                                    {
+                                        "id": "thresholds",
+                                        "value": {
+                                            "mode": "absolute",
+                                            "steps": [
+                                                {
+                                                    "color": "green",
+                                                    "value": null
+                                                },
+                                                {
+                                                    "color": "yellow",
+                                                    "value": 86400
+                                                },
+                                                {
+                                                    "color": "red",
+                                                    "value": 604800
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "id": "custom.cellOptions",
+                                        "value": {
+                                            "type": "color-text"
+                                        }
+                                    }
+                                ]
                             }
                         ]
                     },
@@ -1074,6 +1112,13 @@
                             "instant": true,
                             "legendFormat": "",
                             "refId": "uptime"
+                        },
+                        {
+                            "expr": "time() - pve_vm_last_backup_timestamp{node=~\"$node\"}",
+                            "format": "table",
+                            "instant": true,
+                            "legendFormat": "",
+                            "refId": "backup"
                         }
                     ],
                     "title": "Virtual Machines",
@@ -1093,29 +1138,35 @@
                                     "Time 2": true,
                                     "Time 3": true,
                                     "Time 4": true,
+                                    "Time 5": true,
                                     "__name__": true,
                                     "__name__ 1": true,
                                     "__name__ 2": true,
                                     "__name__ 3": true,
                                     "__name__ 4": true,
+                                    "__name__ 5": true,
                                     "job": true,
                                     "job 1": true,
                                     "job 2": true,
                                     "job 3": true,
                                     "job 4": true,
+                                    "job 5": true,
                                     "instance": true,
                                     "instance 1": true,
                                     "instance 2": true,
                                     "instance 3": true,
                                     "instance 4": true,
+                                    "instance 5": true,
                                     "node 1": true,
                                     "node 2": true,
                                     "node 3": true,
                                     "node 4": true,
+                                    "node 5": true,
                                     "name 1": true,
                                     "name 2": true,
                                     "name 3": true,
-                                    "name 4": true
+                                    "name 4": true,
+                                    "name 5": true
                                 },
                                 "indexByName": {},
                                 "renameByName": {
@@ -1123,6 +1174,7 @@
                                     "Value #cpu": "CPU",
                                     "Value #mem": "Memory",
                                     "Value #uptime": "Uptime",
+                                    "Value #backup": "Last Backup",
                                     "name": "Name",
                                     "node": "Node",
                                     "vmid": "VMID"
@@ -1614,6 +1666,44 @@
                                         "value": "s"
                                     }
                                 ]
+                            },
+                            {
+                                "matcher": {
+                                    "id": "byName",
+                                    "options": "Last Backup"
+                                },
+                                "properties": [
+                                    {
+                                        "id": "unit",
+                                        "value": "s"
+                                    },
+                                    {
+                                        "id": "thresholds",
+                                        "value": {
+                                            "mode": "absolute",
+                                            "steps": [
+                                                {
+                                                    "color": "green",
+                                                    "value": null
+                                                },
+                                                {
+                                                    "color": "yellow",
+                                                    "value": 86400
+                                                },
+                                                {
+                                                    "color": "red",
+                                                    "value": 604800
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    {
+                                        "id": "custom.cellOptions",
+                                        "value": {
+                                            "type": "color-text"
+                                        }
+                                    }
+                                ]
                             }
                         ]
                     },
@@ -1670,6 +1760,13 @@
                             "instant": true,
                             "legendFormat": "",
                             "refId": "uptime"
+                        },
+                        {
+                            "expr": "time() - pve_lxc_last_backup_timestamp{node=~\"$node\"}",
+                            "format": "table",
+                            "instant": true,
+                            "legendFormat": "",
+                            "refId": "backup"
                         }
                     ],
                     "title": "LXC Containers",
@@ -1689,29 +1786,35 @@
                                     "Time 2": true,
                                     "Time 3": true,
                                     "Time 4": true,
+                                    "Time 5": true,
                                     "__name__": true,
                                     "__name__ 1": true,
                                     "__name__ 2": true,
                                     "__name__ 3": true,
                                     "__name__ 4": true,
+                                    "__name__ 5": true,
                                     "job": true,
                                     "job 1": true,
                                     "job 2": true,
                                     "job 3": true,
                                     "job 4": true,
+                                    "job 5": true,
                                     "instance": true,
                                     "instance 1": true,
                                     "instance 2": true,
                                     "instance 3": true,
                                     "instance 4": true,
+                                    "instance 5": true,
                                     "node 1": true,
                                     "node 2": true,
                                     "node 3": true,
                                     "node 4": true,
+                                    "node 5": true,
                                     "name 1": true,
                                     "name 2": true,
                                     "name 3": true,
-                                    "name 4": true
+                                    "name 4": true,
+                                    "name 5": true
                                 },
                                 "indexByName": {},
                                 "renameByName": {
@@ -1719,6 +1822,7 @@
                                     "Value #cpu": "CPU",
                                     "Value #mem": "Memory",
                                     "Value #uptime": "Uptime",
+                                    "Value #backup": "Last Backup",
                                     "name": "Name",
                                     "node": "Node",
                                     "vmid": "VMID"
