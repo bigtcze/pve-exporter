@@ -1,6 +1,7 @@
 # Proxmox VE Exporter
 [![Go Report Card](https://goreportcard.com/badge/github.com/bigtcze/pve-exporter)](https://goreportcard.com/report/github.com/bigtcze/pve-exporter)
 [![GitHub release](https://img.shields.io/github/release/bigtcze/pve-exporter.svg)](https://github.com/bigtcze/pve-exporter/releases)
+[![GitHub Downloads](https://img.shields.io/github/downloads/bigtcze/pve-exporter/total.svg)](https://github.com/bigtcze/pve-exporter/releases)
 [![License](https://img.shields.io/github/license/bigtcze/pve-exporter.svg)](LICENSE)
 
 A professional Prometheus exporter for Proxmox VE, written in Go. It collects comprehensive metrics from your Proxmox nodes, virtual machines (QEMU), LXC containers, and storage, exposing them for monitoring and alerting.
