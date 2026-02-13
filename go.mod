@@ -1,8 +1,8 @@
 module github.com/bigtcze/pve-exporter
 
-go 1.24.0
+go 1.25
 
-toolchain go1.24.4
+toolchain go1.25.6
 
 require (
 	github.com/prometheus/client_golang v1.23.2
