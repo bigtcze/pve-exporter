@@ -2,21 +2,42 @@ package collector
 
 import (
 	"crypto/tls"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/bigtcze/pve-exporter/config"
 	"github.com/prometheus/client_golang/prometheus"
+	"golang.org/x/time/rate"
 )
+
+const (
+	maxIdleConns        = 100
+	maxIdleConnsPerHost = 10
+	idleConnTimeout     = 90 * time.Second
+)
+
+var (
+	version = "dev"
+	commit  = "none"
+)
+
+func SetBuildInfo(v, c string) {
+	version = v
+	commit = c
+}
 
 // ProxmoxCollector collects metrics from Proxmox VE API
 type ProxmoxCollector struct {
 	config *config.ProxmoxConfig
 	client *http.Client
-	ticket string
-	csrf   string
-	mutex  sync.RWMutex
+	ticket     string
+	csrf       string
+	mutex      sync.RWMutex
+	limiter    *rate.Limiter
+	ticketTime time.Time
+	logger     *slog.Logger
 	// Node metrics
 	nodeUp          *prometheus.Desc
 	nodeUptime      *prometheus.Desc
@@ -179,6 +200,11 @@ type ProxmoxCollector struct {
 
 	// Certificate metrics
 	certificateExpiry *prometheus.Desc
+
+	// Exporter self-monitoring metrics
+	exporterUp             *prometheus.Desc
+	exporterBuildInfo      *prometheus.Desc
+	exporterScrapeDuration *prometheus.Desc
 }
 
 // GuestInfo represents VM or LXC container info for sharing between collectors
@@ -189,23 +215,28 @@ type GuestInfo struct {
 }
 
 // NewProxmoxCollector creates a new Proxmox collector
-func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
+func NewProxmoxCollector(cfg *config.ProxmoxConfig, logger *slog.Logger) *ProxmoxCollector {
+	if logger == nil {
+		logger = slog.Default()
+	}
+
 	client := &http.Client{
 		Timeout: cfg.Timeout,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: cfg.InsecureSkipVerify,
 			},
-			// Connection pooling for better performance
-			MaxIdleConns:        100,
-			MaxIdleConnsPerHost: 10,
-			IdleConnTimeout:     90 * time.Second,
+			MaxIdleConns:        maxIdleConns,
+			MaxIdleConnsPerHost: maxIdleConnsPerHost,
+			IdleConnTimeout:     idleConnTimeout,
 		},
 	}
 
 	return &ProxmoxCollector{
-		config: cfg,
-		client: client,
+		config:  cfg,
+		client:  client,
+		logger:  logger,
+		limiter: rate.NewLimiter(rate.Every(100*time.Millisecond), 10), // 10 req/s with burst of 10
 
 		// Node metrics
 		nodeUp: prometheus.NewDesc(
@@ -900,6 +931,22 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig) *ProxmoxCollector {
 			"pve_certificate_expiry_seconds",
 			"Seconds until SSL certificate expires",
 			[]string{"node"}, nil,
+		),
+
+		exporterUp: prometheus.NewDesc(
+			"pve_exporter_up",
+			"Whether the PVE API is reachable (1=yes, 0=no)",
+			nil, nil,
+		),
+		exporterBuildInfo: prometheus.NewDesc(
+			"pve_exporter_build_info",
+			"Build information about the exporter",
+			[]string{"version", "commit", "goversion"}, nil,
+		),
+		exporterScrapeDuration: prometheus.NewDesc(
+			"pve_exporter_scrape_duration_seconds",
+			"Duration of the last scrape in seconds",
+			nil, nil,
 		),
 	}
 }

@@ -2,7 +2,9 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -65,6 +67,15 @@ func LoadFromFile(configFile string) (*Config, error) {
 		if err := yaml.Unmarshal(data, cfg); err != nil {
 			return nil, fmt.Errorf("failed to parse config file: %w", err)
 		}
+
+		// Warn if config file is world-readable
+		info, err := os.Stat(configFile)
+		if err == nil {
+			mode := info.Mode().Perm()
+			if mode&0o007 != 0 {
+				slog.Warn("config file is world-readable, consider chmod 640", "file", configFile, "mode", fmt.Sprintf("%o", mode))
+			}
+		}
 	}
 
 	// Validate configuration
@@ -79,6 +90,26 @@ func LoadFromFile(configFile string) (*Config, error) {
 func (c *Config) Validate() error {
 	if c.Proxmox.Host == "" {
 		return fmt.Errorf("proxmox host is required")
+	}
+
+	// Port range validation
+	if c.Proxmox.Port < 1 || c.Proxmox.Port > 65535 {
+		return fmt.Errorf("proxmox port must be between 1 and 65535, got %d", c.Proxmox.Port)
+	}
+
+	// Timeout auto-fix (don't error, just reset to default)
+	if c.Proxmox.Timeout < 1*time.Second {
+		c.Proxmox.Timeout = 30 * time.Second
+	}
+
+	// MetricsPath must start with /
+	if c.Server.MetricsPath != "" && !strings.HasPrefix(c.Server.MetricsPath, "/") {
+		return fmt.Errorf("server metrics_path must start with '/', got %q", c.Server.MetricsPath)
+	}
+
+	// TokenID format: must contain '!' if set
+	if c.Proxmox.TokenID != "" && !strings.Contains(c.Proxmox.TokenID, "!") {
+		return fmt.Errorf("proxmox token_id must be in format 'user@realm!tokenname', got %q", c.Proxmox.TokenID)
 	}
 
 	// Check authentication method

@@ -3,7 +3,6 @@ package collector
 import (
 	"bufio"
 	"encoding/json"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -19,6 +18,10 @@ const (
 	smartDataMaxAge = 10 * time.Minute
 	// Path to diskstats
 	diskstatsPath = "/proc/diskstats"
+	// Sector size in bytes (standard Linux sector size)
+	sectorSizeBytes = 512
+	// Milliseconds per second
+	msPerSecond = 1000
 )
 
 // SmartData represents the JSON structure from pve-smart-collector.sh
@@ -62,27 +65,27 @@ func (c *ProxmoxCollector) collectSmartMetrics(ch chan<- prometheus.Metric) {
 		return
 	}
 	if err != nil {
-		log.Printf("Error checking SMART data file: %v", err)
+		c.logger.Error("failed to check SMART data file", "error", err)
 		return
 	}
 
 	// Check if file is too old
 	if time.Since(info.ModTime()) > smartDataMaxAge {
-		log.Printf("SMART data file is stale (older than %v), skipping", smartDataMaxAge)
+		c.logger.Warn("SMART data file is stale, skipping", "max_age", smartDataMaxAge)
 		return
 	}
 
 	// Read file
 	data, err := os.ReadFile(smartDataPath)
 	if err != nil {
-		log.Printf("Error reading SMART data file: %v", err)
+		c.logger.Error("failed to read SMART data file", "error", err)
 		return
 	}
 
 	// Parse JSON
 	var smartData SmartData
 	if err := json.Unmarshal(data, &smartData); err != nil {
-		log.Printf("Error parsing SMART data JSON: %v", err)
+		c.logger.Error("failed to parse SMART data JSON", "error", err)
 		return
 	}
 
@@ -167,10 +170,10 @@ func (c *ProxmoxCollector) collectDiskIOMetrics(ch chan<- prometheus.Metric, hos
 		sectorsWritten, _ := strconv.ParseFloat(fields[9], 64)
 		ioTimeMs, _ := strconv.ParseFloat(fields[12], 64)
 
-		// Each sector is 512 bytes
-		readBytes := sectorsRead * 512
-		writeBytes := sectorsWritten * 512
-		ioTimeSeconds := ioTimeMs / 1000
+	// Each sector is 512 bytes
+	readBytes := sectorsRead * sectorSizeBytes
+	writeBytes := sectorsWritten * sectorSizeBytes
+	ioTimeSeconds := ioTimeMs / msPerSecond
 
 		labels := []string{hostname, device}
 

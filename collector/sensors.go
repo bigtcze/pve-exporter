@@ -2,7 +2,6 @@ package collector
 
 import (
 	"encoding/json"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -97,7 +96,7 @@ func (c *ProxmoxCollector) collectSensorsMetrics(ch chan<- prometheus.Metric) {
 
 	var sensorsData map[string]interface{}
 	if err := json.Unmarshal(output, &sensorsData); err != nil {
-		log.Printf("Error parsing sensors JSON: %v", err)
+		c.logger.Error("failed to parse sensors JSON", "error", err)
 		return
 	}
 

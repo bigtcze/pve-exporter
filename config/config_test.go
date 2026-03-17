@@ -86,6 +86,7 @@ func TestValidate(t *testing.T) {
 			cfg: Config{
 				Proxmox: ProxmoxConfig{
 					Host:     "localhost",
+					Port:     8006,
 					User:     "root@pam",
 					Password: "password",
 				},
@@ -97,6 +98,7 @@ func TestValidate(t *testing.T) {
 			cfg: Config{
 				Proxmox: ProxmoxConfig{
 					Host:        "localhost",
+					Port:        8006,
 					TokenID:     "user@pam!token",
 					TokenSecret: "secret",
 				},
@@ -108,6 +110,7 @@ func TestValidate(t *testing.T) {
 			cfg: Config{
 				Proxmox: ProxmoxConfig{
 					Host:     "",
+					Port:     8006,
 					User:     "root@pam",
 					Password: "password",
 				},
@@ -119,9 +122,79 @@ func TestValidate(t *testing.T) {
 			cfg: Config{
 				Proxmox: ProxmoxConfig{
 					Host: "localhost",
+					Port: 8006,
 				},
 			},
 			wantErr: true,
+		},
+		{
+			name: "invalid port too low",
+			cfg: Config{
+				Proxmox: ProxmoxConfig{
+					Host:     "localhost",
+					Port:     0,
+					Password: "x",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid port too high",
+			cfg: Config{
+				Proxmox: ProxmoxConfig{
+					Host:     "localhost",
+					Port:     70000,
+					Password: "x",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "valid port",
+			cfg: Config{
+				Proxmox: ProxmoxConfig{
+					Host:     "localhost",
+					Port:     8006,
+					Password: "x",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid metrics path",
+			cfg: Config{
+				Proxmox: ProxmoxConfig{
+					Host:     "localhost",
+					Port:     8006,
+					Password: "x",
+				},
+				Server: ServerConfig{MetricsPath: "metrics"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid token format",
+			cfg: Config{
+				Proxmox: ProxmoxConfig{
+					Host:        "localhost",
+					Port:        8006,
+					TokenID:     "badformat",
+					TokenSecret: "secret",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "valid token format",
+			cfg: Config{
+				Proxmox: ProxmoxConfig{
+					Host:        "localhost",
+					Port:        8006,
+					TokenID:     "user@pam!token",
+					TokenSecret: "secret",
+				},
+			},
+			wantErr: false,
 		},
 	}
 
