@@ -1,6 +1,9 @@
 package main
 
 import (
+	"bufio"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +13,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 )
 
 const (
@@ -29,7 +33,8 @@ type GitHubRelease struct {
 
 // CheckLatestVersion queries GitHub API for the latest release
 func CheckLatestVersion() (*GitHubRelease, error) {
-	resp, err := http.Get(releaseAPI)
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Get(releaseAPI)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query GitHub API: %w", err)
 	}
@@ -120,7 +125,8 @@ func getExecutablePath() (string, error) {
 
 // downloadBinary downloads a binary from URL to a temp file
 func downloadBinary(downloadURL, execPath string) (string, error) {
-	resp, err := http.Get(downloadURL)
+	client := &http.Client{Timeout: 5 * time.Minute}
+	resp, err := client.Get(downloadURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to download binary: %w", err)
 	}
@@ -209,6 +215,62 @@ func restartService() {
 	fmt.Println("Service restarted successfully!")
 }
 
+// downloadChecksums downloads and parses the checksums.txt file from a release
+func downloadChecksums(release *GitHubRelease) (map[string]string, error) {
+	var checksumURL string
+	for _, asset := range release.Assets {
+		if asset.Name == "checksums.txt" {
+			checksumURL = asset.BrowserDownloadURL
+			break
+		}
+	}
+	if checksumURL == "" {
+		return nil, fmt.Errorf("checksums.txt not found in release assets")
+	}
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Get(checksumURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download checksums: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("checksums download failed with status %d", resp.StatusCode)
+	}
+
+	checksums := make(map[string]string)
+	scanner := bufio.NewScanner(resp.Body)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.Fields(line)
+		if len(parts) == 2 {
+			checksums[parts[1]] = parts[0] // filename -> hash
+		}
+	}
+	return checksums, scanner.Err()
+}
+
+// verifyChecksum verifies the SHA256 checksum of a file
+func verifyChecksum(filePath, expectedHash string) error {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to open file for checksum: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return fmt.Errorf("failed to compute checksum: %w", err)
+	}
+
+	actualHash := hex.EncodeToString(h.Sum(nil))
+	if actualHash != expectedHash {
+		return fmt.Errorf("checksum mismatch: expected %s, got %s", expectedHash, actualHash)
+	}
+	return nil
+}
+
 // SelfUpdate performs the self-update process
 func SelfUpdate(currentVersion string) error {
 	fmt.Println("Checking for updates...")
@@ -241,6 +303,23 @@ func SelfUpdate(currentVersion string) error {
 	tmpPath, err := downloadBinary(downloadURL, execPath)
 	if err != nil {
 		return err
+	}
+
+	checksums, err := downloadChecksums(release)
+	if err != nil {
+		fmt.Printf("Warning: Could not verify checksum: %v\n", err)
+		fmt.Println("Proceeding without checksum verification...")
+	} else {
+		binaryName := getBinaryName()
+		expectedHash, ok := checksums[binaryName]
+		if !ok {
+			fmt.Printf("Warning: No checksum found for %s\n", binaryName)
+		} else if err := verifyChecksum(tmpPath, expectedHash); err != nil {
+			_ = os.Remove(tmpPath)
+			return fmt.Errorf("checksum verification failed: %w", err)
+		} else {
+			fmt.Println("Checksum verified successfully!")
+		}
 	}
 
 	if err := verifyBinary(tmpPath); err != nil {
