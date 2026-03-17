@@ -2,15 +2,16 @@ package collector
 
 import (
 	"bufio"
-	"encoding/json"
-	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
+)
+
+const (
+	percentMultiplier = 100
 )
 
 // collectZFSMetricsWithNodes collects ZFS metrics using pre-fetched nodes list
@@ -21,33 +22,14 @@ func (c *ProxmoxCollector) collectZFSMetricsWithNodes(ch chan<- prometheus.Metri
 
 // collectZFSPoolMetricsWithNodes collects ZFS pool metrics using pre-fetched nodes list
 func (c *ProxmoxCollector) collectZFSPoolMetricsWithNodes(ch chan<- prometheus.Metric, nodes []string) {
-	// Process nodes in parallel for better performance
 	var wg sync.WaitGroup
 	for _, node := range nodes {
 		wg.Add(1)
 		go func(nodeName string) {
 			defer wg.Done()
 
-			path := fmt.Sprintf("/nodes/%s/disks/zfs", nodeName)
-			data, err := c.apiRequest(path)
+			result, err := fetchJSON[zfsPoolResponse](c, apiPathf("/nodes/%s/disks/zfs", nodeName))
 			if err != nil {
-				// ZFS might not be installed or configured on this node
-				return
-			}
-
-			var result struct {
-				Data []struct {
-					Name   string  `json:"name"`
-					Health string  `json:"health"`
-					Size   float64 `json:"size"`
-					Alloc  float64 `json:"alloc"`
-					Free   float64 `json:"free"`
-					Frag   float64 `json:"frag"`
-				} `json:"data"`
-			}
-
-			if err := json.Unmarshal(data, &result); err != nil {
-				log.Printf("Error unmarshaling ZFS pools for node %s: %v", nodeName, err)
 				return
 			}
 
@@ -84,10 +66,7 @@ func (c *ProxmoxCollector) collectZFSARCMetrics(ch chan<- prometheus.Metric) {
 	}
 	defer func() { _ = file.Close() }()
 
-	hostname, _ := os.Hostname()
-	if hostname == "" {
-		hostname = "localhost"
-	}
+	hostname := getHostname()
 
 	// Map metric names to their handlers
 	handlers := map[string]arcMetricHandler{
@@ -133,7 +112,7 @@ func (c *ProxmoxCollector) collectZFSARCMetrics(ch chan<- prometheus.Metric) {
 	// Calculate and emit hit ratio percent
 	total := hits + misses
 	if total > 0 {
-		hitRatioPercent := (hits / total) * 100
+		hitRatioPercent := (hits / total) * percentMultiplier
 		ch <- prometheus.MustNewConstMetric(c.zfsARCHitRatio, prometheus.GaugeValue, hitRatioPercent, hostname)
 	}
 }

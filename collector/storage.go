@@ -1,15 +1,11 @@
 package collector
 
 import (
-	"encoding/json"
-	"fmt"
-	"log"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// collectStorageMetrics collects storage metrics for all nodes in parallel
 func (c *ProxmoxCollector) collectStorageMetrics(ch chan<- prometheus.Metric, nodes []string) {
 	var wg sync.WaitGroup
 	for _, node := range nodes {
@@ -17,29 +13,9 @@ func (c *ProxmoxCollector) collectStorageMetrics(ch chan<- prometheus.Metric, no
 		go func(nodeName string) {
 			defer wg.Done()
 
-			path := fmt.Sprintf("/nodes/%s/storage", nodeName)
-			storageData, err := c.apiRequest(path)
+			result, err := fetchJSON[storageResponse](c, apiPathf("/nodes/%s/storage", nodeName))
 			if err != nil {
-				log.Printf("Error fetching storage for node %s: %v", nodeName, err)
-				return
-			}
-
-			var result struct {
-				Data []struct {
-					Storage      string  `json:"storage"`
-					Type         string  `json:"type"`
-					Total        float64 `json:"total"`
-					Used         float64 `json:"used"`
-					Avail        float64 `json:"avail"`
-					Active       int     `json:"active"`
-					Enabled      int     `json:"enabled"`
-					Shared       int     `json:"shared"`
-					UsedFraction float64 `json:"used_fraction"`
-				} `json:"data"`
-			}
-
-			if err := json.Unmarshal(storageData, &result); err != nil {
-				log.Printf("Error unmarshaling storage for node %s: %v", nodeName, err)
+				c.logger.Error("failed to fetch storage", "node", nodeName, "error", err)
 				return
 			}
 
