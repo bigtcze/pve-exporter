@@ -152,4 +152,8 @@ func (c *ProxmoxCollector) Describe(ch chan<- *prometheus.Desc) {
 
 	// Certificate
 	ch <- c.certificateExpiry
+
+	ch <- c.exporterUp
+	ch <- c.exporterBuildInfo
+	ch <- c.exporterScrapeDuration
 }

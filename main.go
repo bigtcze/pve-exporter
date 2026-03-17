@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/bigtcze/pve-exporter/collector"
 	"github.com/bigtcze/pve-exporter/config"
@@ -37,26 +40,34 @@ func main() {
 	// Handle --selfupdate
 	if *selfUpdate {
 		if err := SelfUpdate(version); err != nil {
-			log.Fatalf("Self-update failed: %v", err)
+			slog.Error("self-update failed", "error", err)
+			os.Exit(1)
 		}
 		os.Exit(0)
 	}
 
-	log.Printf("Starting pve-exporter version=%s commit=%s date=%s", version, commit, date)
+	slog.Info("starting pve-exporter", "version", version, "commit", commit, "date", date)
 
 	// Load configuration
 	cfg, err := config.LoadFromFile(*configFile)
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		slog.Error("failed to load configuration", "error", err)
+		os.Exit(1)
 	}
 
-	log.Printf("Connecting to Proxmox at %s:%d", cfg.Proxmox.Host, cfg.Proxmox.Port)
+	if cfg.Proxmox.InsecureSkipVerify {
+		slog.Warn("TLS certificate verification is disabled, this is insecure for production use")
+	}
+
+	collector.SetBuildInfo(version, commit)
+
+	slog.Info("connecting to Proxmox", "host", cfg.Proxmox.Host, "port", cfg.Proxmox.Port)
 
 	// Create Prometheus registry
 	registry := prometheus.NewRegistry()
 
 	// Register Proxmox collector
-	proxmoxCollector := collector.NewProxmoxCollector(&cfg.Proxmox)
+	proxmoxCollector := collector.NewProxmoxCollector(&cfg.Proxmox, slog.Default())
 	registry.MustRegister(proxmoxCollector)
 
 	// Setup HTTP server
@@ -92,25 +103,33 @@ func main() {
 
 	// Start HTTP server
 	server := &http.Server{
-		Addr:    cfg.Server.ListenAddress,
-		Handler: mux,
+		Addr:         cfg.Server.ListenAddress,
+		Handler:      mux,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 60 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
 
-	// Handle graceful shutdown
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	go func() {
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-		<-sigChan
-		log.Println("Shutting down...")
-		_ = server.Close()
+		<-ctx.Done()
+		slog.Info("shutting down gracefully", "timeout", "15s")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			slog.Error("shutdown error", "error", err)
+		}
 	}()
 
-	log.Printf("Starting HTTP server on %s", cfg.Server.ListenAddress)
-	log.Printf("Metrics available at %s", cfg.Server.MetricsPath)
+	slog.Info("starting HTTP server", "address", cfg.Server.ListenAddress)
+	slog.Info("metrics available", "path", cfg.Server.MetricsPath)
 
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatalf("HTTP server failed: %v", err)
+		slog.Error("HTTP server failed", "error", err)
+		os.Exit(1)
 	}
 
-	log.Println("Exporter stopped")
+	slog.Info("exporter stopped")
 }
