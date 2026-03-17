@@ -1,0 +1,1 @@
+{"data":[{"vmid":100,"node":"pve1","name":"web-server","type":"qemu","status":"running"},{"vmid":101,"node":"pve1","name":"db-server","type":"qemu","status":"stopped"},{"vmid":200,"node":"pve1","name":"proxy-ct","type":"lxc","status":"running"}]}
