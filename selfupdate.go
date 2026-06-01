@@ -307,20 +307,22 @@ func SelfUpdate(currentVersion string) error {
 
 	checksums, err := downloadChecksums(release)
 	if err != nil {
-		fmt.Printf("Warning: Could not verify checksum: %v\n", err)
-		fmt.Println("Proceeding without checksum verification...")
-	} else {
-		binaryName := getBinaryName()
-		expectedHash, ok := checksums[binaryName]
-		if !ok {
-			fmt.Printf("Warning: No checksum found for %s\n", binaryName)
-		} else if err := verifyChecksum(tmpPath, expectedHash); err != nil {
-			_ = os.Remove(tmpPath)
-			return fmt.Errorf("checksum verification failed: %w", err)
-		} else {
-			fmt.Println("Checksum verified successfully!")
-		}
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("checksum verification is required but failed to download checksums: %w", err)
 	}
+
+	binaryName := getBinaryName()
+	expectedHash, ok := checksums[binaryName]
+	if !ok {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("no checksum found for %s in checksums.txt, aborting update", binaryName)
+	}
+
+	if err := verifyChecksum(tmpPath, expectedHash); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("checksum verification failed: %w", err)
+	}
+	fmt.Println("Checksum verified successfully!")
 
 	if err := verifyBinary(tmpPath); err != nil {
 		_ = os.Remove(tmpPath)

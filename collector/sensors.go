@@ -86,7 +86,7 @@ func processSensor(sensorMap map[string]interface{}) map[string]float64 {
 
 // collectSensorsMetrics collects hardware sensor metrics using lm-sensors
 func (c *ProxmoxCollector) collectSensorsMetrics(ch chan<- prometheus.Metric) {
-	cmd := exec.Command("sensors", "-j")
+	cmd := exec.Command("/usr/bin/sensors", "-j")
 	output, err := cmd.Output()
 	if err != nil {
 		return
