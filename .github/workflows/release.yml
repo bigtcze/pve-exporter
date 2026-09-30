@@ -23,11 +23,12 @@ jobs:
         uses: actions/setup-go@v7
         with:
           go-version: '1.27'
+          check-latest: true
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.13.2
+          version: v2.14.0
 
       - name: Run tests
         run: go test -v -race ./...
