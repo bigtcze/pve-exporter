@@ -21,5 +21,8 @@ metrics.txt
 .local/
 testing.local.md
 
+# Local agent context (internal)
+.agent/
+
 # Local deepwork state
 .slim/deepwork/
