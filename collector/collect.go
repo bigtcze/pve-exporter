@@ -30,13 +30,15 @@ func (c *ProxmoxCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	ch <- prometheus.MustNewConstMetric(c.exporterUp, prometheus.GaugeValue, 1)
-
 	var nodesResult nodesOnlyResponse
 	if err := unmarshalJSON(nodesData, &nodesResult); err != nil {
 		c.logger.Error("failed to unmarshal nodes", "error", err)
+		ch <- prometheus.MustNewConstMetric(c.exporterUp, prometheus.GaugeValue, 0)
+		ch <- prometheus.MustNewConstMetric(c.exporterScrapeDuration, prometheus.GaugeValue, time.Since(scrapeStart).Seconds())
 		return
 	}
+
+	ch <- prometheus.MustNewConstMetric(c.exporterUp, prometheus.GaugeValue, 1)
 
 	nodes := make([]string, len(nodesResult.Data))
 	for i, n := range nodesResult.Data {

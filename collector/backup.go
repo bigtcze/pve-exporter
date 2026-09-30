@@ -2,8 +2,6 @@ package collector
 
 import (
 	"encoding/json"
-	"fmt"
-	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -86,8 +84,9 @@ func (c *ProxmoxCollector) fetchNodeGuests(nodeName string, guests map[string]Gu
 }
 
 func (c *ProxmoxCollector) collectNodeBackups(nodeName string, totalGuests int, backups map[string]int64, backupsMutex *sync.Mutex) {
-	tasksResult, err := fetchJSON[tasksResponse](c, fmt.Sprintf("/nodes/%s/tasks?typefilter=vzdump&limit=%d", nodeName, taskFetchLimit))
+	tasksResult, err := fetchJSON[tasksResponse](c, apiPathf("/nodes/%s/tasks?typefilter=vzdump&limit=%d", nodeName, taskFetchLimit))
 	if err != nil {
+		c.logger.Error("failed to fetch backup tasks", "node", nodeName, "error", err)
 		return
 	}
 
@@ -138,18 +137,21 @@ func (c *ProxmoxCollector) processBatchBackupJobs(nodeName string, batchJobs []b
 }
 
 func (c *ProxmoxCollector) parseBackupLog(nodeName, upid string, totalGuests int, localBackups map[string]int64, localMutex *sync.Mutex) {
-	logData, err := c.apiRequest(fmt.Sprintf("/nodes/%s/tasks/%s/log?limit=%d", nodeName, url.PathEscape(upid), maxLogLines))
+	logData, err := c.apiRequest(apiPathf("/nodes/%s/tasks/%s/log?limit=%d", nodeName, upid, maxLogLines))
 	if err != nil {
+		c.logger.Error("failed to fetch backup task log", "node", nodeName, "error", err)
 		return
 	}
 
 	var logResult taskLogResponse
-	if json.Unmarshal(logData, &logResult) != nil {
+	if err := json.Unmarshal(logData, &logResult); err != nil {
+		c.logger.Error("failed to decode backup task log", "node", nodeName, "error", err)
 		return
 	}
 
 	var currentVMID string
 	foundCount := 0
+	foundVMIDs := make(map[string]struct{})
 	for _, line := range logResult.Data {
 		if match := backupFinishedRe.FindStringSubmatch(line.T); match != nil {
 			currentVMID = match[1]
@@ -170,7 +172,10 @@ func (c *ProxmoxCollector) parseBackupLog(nodeName, upid string, totalGuests int
 		localMutex.Lock()
 		if existing, ok := localBackups[currentVMID]; !ok || timestamp > existing {
 			localBackups[currentVMID] = timestamp
-			foundCount++
+			if _, found := foundVMIDs[currentVMID]; !found {
+				foundVMIDs[currentVMID] = struct{}{}
+				foundCount++
+			}
 		}
 		localMutex.Unlock()
 		currentVMID = ""

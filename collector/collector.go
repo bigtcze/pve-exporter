@@ -30,14 +30,15 @@ func SetBuildInfo(v, c string) {
 
 // ProxmoxCollector collects metrics from Proxmox VE API
 type ProxmoxCollector struct {
-	config *config.ProxmoxConfig
-	client *http.Client
-	ticket     string
-	csrf       string
-	mutex      sync.RWMutex
-	limiter    *rate.Limiter
-	ticketTime time.Time
-	logger     *slog.Logger
+	config           *config.ProxmoxConfig
+	client           *http.Client
+	ticket           string
+	csrf             string
+	mutex            sync.RWMutex
+	limiter          *rate.Limiter
+	ticketTime       time.Time
+	ticketGeneration *authTicketGeneration
+	logger           *slog.Logger
 	// Node metrics
 	nodeUp          *prometheus.Desc
 	nodeUptime      *prometheus.Desc

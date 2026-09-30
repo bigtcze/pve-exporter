@@ -15,7 +15,7 @@ func (c *ProxmoxCollector) collectClusterMetrics(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	var nodesTotal, nodesOnline int
+	var nodesTotal, fallbackNodesTotal, nodesOnline int
 	var hasClusterEntry bool
 	for _, item := range result.Data {
 		switch item.Type {
@@ -24,9 +24,7 @@ func (c *ProxmoxCollector) collectClusterMetrics(ch chan<- prometheus.Metric) {
 			nodesTotal = item.Nodes
 			hasClusterEntry = true
 		case "node":
-			if nodesTotal == 0 {
-				nodesTotal++
-			}
+			fallbackNodesTotal++
 			if item.Online == 1 {
 				nodesOnline++
 			}
@@ -35,6 +33,7 @@ func (c *ProxmoxCollector) collectClusterMetrics(ch chan<- prometheus.Metric) {
 
 	if !hasClusterEntry {
 		ch <- prometheus.MustNewConstMetric(c.clusterQuorate, prometheus.GaugeValue, 1)
+		nodesTotal = fallbackNodesTotal
 	}
 
 	ch <- prometheus.MustNewConstMetric(c.clusterNodesTotal, prometheus.GaugeValue, float64(nodesTotal))
@@ -62,6 +61,7 @@ func (c *ProxmoxCollector) collectClusterMetrics(ch chan<- prometheus.Metric) {
 func (c *ProxmoxCollector) collectReplicationMetrics(ch chan<- prometheus.Metric) {
 	result, err := fetchJSON[replicationResponse](c, "/cluster/replication")
 	if err != nil {
+		c.logger.Error("failed to fetch replication status", "error", err)
 		return
 	}
 

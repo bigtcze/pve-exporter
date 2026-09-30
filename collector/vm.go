@@ -50,10 +50,18 @@ func (c *ProxmoxCollector) collectResourceMetrics(ch chan<- prometheus.Metric, n
 			var detailData []byte
 			if vm.Status == "running" {
 				detailPath := apiPathf("/nodes/%s/%s/%d/status/current", node, resType, vm.VMID)
-				detailData, err = c.apiRequest(detailPath)
-				if err == nil {
+				data, detailErr := c.apiRequest(detailPath)
+				if detailErr != nil {
+					c.logger.Error("failed to fetch resource details", "node", node, "type", resType, "vmid", vm.VMID, "error", detailErr)
+				} else {
+					detailData = data
 					var detailResult vmDetailResponse
-					if json.Unmarshal(detailData, &detailResult) == nil {
+					if decodeErr := json.Unmarshal(data, &detailResult); decodeErr != nil {
+						if resType == "qemu" {
+							c.logger.Error("failed to decode VM details", "node", node, "vmid", vm.VMID, "error", decodeErr)
+							detailData = nil
+						}
+					} else {
 						diskRead = detailResult.Data.DiskRead
 						diskWrite = detailResult.Data.DiskWrite
 					}
@@ -102,6 +110,7 @@ func (c *ProxmoxCollector) collectLXCSwapMetricsFromData(ch chan<- prometheus.Me
 
 	var result lxcDetailResponse
 	if err := json.Unmarshal(data, &result); err != nil {
+		c.logger.Error("failed to decode LXC details", "node", labels[0], "vmid", labels[1], "error", err)
 		return
 	}
 

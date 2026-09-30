@@ -2,6 +2,7 @@ package collector
 
 import (
 	"bufio"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -30,6 +31,7 @@ func (c *ProxmoxCollector) collectZFSPoolMetricsWithNodes(ch chan<- prometheus.M
 
 			result, err := fetchJSON[zfsPoolResponse](c, apiPathf("/nodes/%s/disks/zfs", nodeName))
 			if err != nil {
+				c.logger.Error("failed to fetch ZFS pools", "node", nodeName, "error", err)
 				return
 			}
 
@@ -66,7 +68,10 @@ func (c *ProxmoxCollector) collectZFSARCMetrics(ch chan<- prometheus.Metric) {
 	}
 	defer func() { _ = file.Close() }()
 
-	hostname := getHostname()
+	c.collectZFSARCFromReader(ch, file, getHostname())
+}
+
+func (c *ProxmoxCollector) collectZFSARCFromReader(ch chan<- prometheus.Metric, reader io.Reader, hostname string) {
 
 	// Map metric names to their handlers
 	handlers := map[string]arcMetricHandler{
@@ -84,7 +89,7 @@ func (c *ProxmoxCollector) collectZFSARCMetrics(ch chan<- prometheus.Metric) {
 
 	var hits, misses float64
 
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := scanner.Text()
 		fields := strings.Fields(line)
@@ -107,6 +112,9 @@ func (c *ProxmoxCollector) collectZFSARCMetrics(ch chan<- prometheus.Metric) {
 				misses = value
 			}
 		}
+	}
+	if err := scanner.Err(); err != nil {
+		c.logger.Error("failed to scan ZFS ARC stats", "error", err)
 	}
 
 	// Calculate and emit hit ratio percent

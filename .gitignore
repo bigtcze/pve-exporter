@@ -21,3 +21,5 @@ metrics.txt
 .local/
 testing.local.md
 
+# Local deepwork state
+.slim/deepwork/

@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Go 1.21 or later
+- Go 1.27 or later
 - Access to a Proxmox VE instance for testing
 
 ## Local Development Setup
