@@ -506,7 +506,7 @@ Import dashboard [24550 from Grafana.com](https://grafana.com/grafana/dashboards
 
 ## Development
 
-Requires Go 1.27 or newer and `make`. From the repository root:
+Requires Go 1.27.3 or newer and `make`. From the repository root:
 
 ```bash
 make build
