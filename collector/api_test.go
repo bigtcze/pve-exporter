@@ -292,16 +292,7 @@ func TestRequestStartingDuringFailedRefreshJoinsGeneration(t *testing.T) {
 	}
 
 	releaseLoginOnce.Do(func() { close(releaseLogin) })
-	for i, result := range []<-chan error{firstResult, secondResult} {
-		select {
-		case err := <-result:
-			if err == nil || !strings.Contains(err.Error(), "re-authentication failed") {
-				t.Errorf("request %d error = %v, want refresh failure", i+1, err)
-			}
-		case <-time.After(testBarrierTimeout):
-			t.Fatalf("request %d did not consume refresh result", i+1)
-		}
-	}
+	assertFailedRefreshResults(t, firstResult, secondResult)
 	if got := ticketRequests.Load(); got != 1 {
 		t.Fatalf("ticket requests = %d, want 1", got)
 	}
@@ -317,6 +308,20 @@ func TestRequestStartingDuringFailedRefreshJoinsGeneration(t *testing.T) {
 	}
 	if got := apiRequests.Load(); got != 2 {
 		t.Fatalf("API requests after later request = %d, want 2", got)
+	}
+}
+
+func assertFailedRefreshResults(t *testing.T, results ...<-chan error) {
+	t.Helper()
+	for i, result := range results {
+		select {
+		case err := <-result:
+			if err == nil || !strings.Contains(err.Error(), "re-authentication failed") {
+				t.Errorf("request %d error = %v, want refresh failure", i+1, err)
+			}
+		case <-time.After(testBarrierTimeout):
+			t.Fatalf("request %d did not consume refresh result", i+1)
+		}
 	}
 }
 

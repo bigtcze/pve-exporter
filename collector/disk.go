@@ -170,10 +170,10 @@ func (c *ProxmoxCollector) collectDiskIOMetrics(ch chan<- prometheus.Metric, hos
 		sectorsWritten, _ := strconv.ParseFloat(fields[9], 64)
 		ioTimeMs, _ := strconv.ParseFloat(fields[12], 64)
 
-	// Each sector is 512 bytes
-	readBytes := sectorsRead * sectorSizeBytes
-	writeBytes := sectorsWritten * sectorSizeBytes
-	ioTimeSeconds := ioTimeMs / msPerSecond
+		// Each sector is 512 bytes
+		readBytes := sectorsRead * sectorSizeBytes
+		writeBytes := sectorsWritten * sectorSizeBytes
+		ioTimeSeconds := ioTimeMs / msPerSecond
 
 		labels := []string{hostname, device}
 

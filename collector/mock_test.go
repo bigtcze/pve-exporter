@@ -18,65 +18,87 @@ import (
 
 func newTestServer(t *testing.T) *httptest.Server {
 	t.Helper()
-
 	mux := http.NewServeMux()
+	registerTestAuthAndNodesHandlers(mux)
+	registerTestClusterHandlers(mux)
+	return httptest.NewTLSServer(mux)
+}
 
+func registerTestAuthAndNodesHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/api2/json/access/ticket", func(w http.ResponseWriter, r *http.Request) {
 		serveFixture(w, "testdata/ticket.json")
 	})
-
 	mux.HandleFunc("/api2/json/nodes", func(w http.ResponseWriter, r *http.Request) {
 		serveFixture(w, "testdata/nodes.json")
 	})
+	mux.HandleFunc("/api2/json/nodes/", serveTestNodeRequest)
+}
 
-	mux.HandleFunc("/api2/json/nodes/", func(w http.ResponseWriter, r *http.Request) {
-		path := strings.TrimPrefix(r.URL.Path, "/api2/json/nodes/")
-		parts := strings.Split(path, "/")
+func serveTestNodeRequest(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api2/json/nodes/"), "/")
+	if len(parts) < 2 {
+		http.NotFound(w, r)
+		return
+	}
+	fixture := testNodeFixture(parts)
+	if fixture == "" {
+		http.NotFound(w, r)
+		return
+	}
+	serveFixture(w, fixture)
+}
 
-		if len(parts) < 2 {
-			http.NotFound(w, r)
-			return
+func testNodeFixture(parts []string) string {
+	switch parts[1] {
+	case "status":
+		if len(parts) == 2 {
+			return "testdata/node_status.json"
 		}
-
-		switch {
-		case parts[1] == "status" && len(parts) == 2:
-			serveFixture(w, "testdata/node_status.json")
-		case parts[1] == "qemu" && len(parts) == 2:
-			serveFixture(w, "testdata/qemu.json")
-		case parts[1] == "lxc" && len(parts) == 2:
-			serveFixture(w, "testdata/lxc.json")
-		case parts[1] == "storage" && len(parts) == 2:
-			serveFixture(w, "testdata/storage.json")
-		case parts[1] == "tasks" && len(parts) == 2:
-			serveFixture(w, "testdata/tasks.json")
-		case parts[1] == "disks" && len(parts) >= 3 && parts[2] == "zfs":
-			serveFixture(w, "testdata/zfs.json")
-		case parts[1] == "certificates" && len(parts) >= 3 && parts[2] == "info":
-			serveFixture(w, "testdata/certificates.json")
-		case parts[1] == "qemu" && len(parts) >= 4 && parts[3] == "status":
-			serveFixture(w, "testdata/qemu_status.json")
-		case parts[1] == "lxc" && len(parts) >= 4 && parts[3] == "status":
-			serveFixture(w, "testdata/lxc_status.json")
-		default:
-			http.NotFound(w, r)
+	case "qemu":
+		return testGuestFixture(parts, "qemu")
+	case "lxc":
+		return testGuestFixture(parts, "lxc")
+	case "storage":
+		if len(parts) == 2 {
+			return "testdata/storage.json"
 		}
-	})
+	case "tasks":
+		if len(parts) == 2 {
+			return "testdata/tasks.json"
+		}
+	case "disks":
+		if len(parts) >= 3 && parts[2] == "zfs" {
+			return "testdata/zfs.json"
+		}
+	case "certificates":
+		if len(parts) >= 3 && parts[2] == "info" {
+			return "testdata/certificates.json"
+		}
+	}
+	return ""
+}
 
-	mux.HandleFunc("/api2/json/cluster/status", func(w http.ResponseWriter, r *http.Request) {
-		serveFixture(w, "testdata/cluster_status.json")
-	})
-	mux.HandleFunc("/api2/json/cluster/resources", func(w http.ResponseWriter, r *http.Request) {
-		serveFixture(w, "testdata/cluster_resources.json")
-	})
-	mux.HandleFunc("/api2/json/cluster/ha/resources", func(w http.ResponseWriter, r *http.Request) {
-		serveFixture(w, "testdata/ha_resources.json")
-	})
-	mux.HandleFunc("/api2/json/cluster/replication", func(w http.ResponseWriter, r *http.Request) {
-		serveFixture(w, "testdata/replication.json")
-	})
+func testGuestFixture(parts []string, guestType string) string {
+	if len(parts) == 2 {
+		return "testdata/" + guestType + ".json"
+	}
+	if len(parts) >= 4 && parts[3] == "status" {
+		return "testdata/" + guestType + "_status.json"
+	}
+	return ""
+}
 
-	server := httptest.NewTLSServer(mux)
-	return server
+func registerTestClusterHandlers(mux *http.ServeMux) {
+	for path, fixture := range map[string]string{
+		"/api2/json/cluster/status":       "testdata/cluster_status.json",
+		"/api2/json/cluster/resources":    "testdata/cluster_resources.json",
+		"/api2/json/cluster/ha/resources": "testdata/ha_resources.json",
+		"/api2/json/cluster/replication":  "testdata/replication.json",
+	} {
+		mux.HandleFunc(path, func(w http.ResponseWriter, _ *http.Request) {
+			serveFixture(w, fixture)
+		})
+	}
 }
 
 func serveFixture(w http.ResponseWriter, path string) {

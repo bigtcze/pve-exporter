@@ -22,86 +22,115 @@ func TestCompatibilityGuestScenarios(t *testing.T) {
 				continue
 			}
 			t.Run(resType+"/"+scenario, func(t *testing.T) {
-				var detailRequests atomic.Int32
-				server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-					if r.URL.Path == "/api2/json/nodes/node1/"+resType {
-						if scenario == "list403" {
-							http.Error(w, "Forbidden", http.StatusForbidden)
-							return
-						}
-						status := "running"
-						if scenario == "stopped" {
-							status = "stopped"
-						}
-						_, _ = fmt.Fprintf(w, `{"data":[{"vmid":100,"name":"guest","status":%q,"diskread":111,"diskwrite":222}]}`, status)
-						return
-					}
-					detailRequests.Add(1)
-					switch scenario {
-					case "failed-details":
-						http.NotFound(w, r)
-					case "malformed-details":
-						_, _ = io.WriteString(w, `{"data":`)
-					case "string-psi":
-						_, _ = io.WriteString(w, `{"data":{"diskread":999,"diskwrite":888,"swap":12,"maxswap":24,"pressurecpufull":"0.25"}}`)
-					default:
-						_, _ = io.WriteString(w, `{"data":{}}`)
-					}
-				}))
-				defer server.Close()
-				c := apiTestCollector(t, server, &config.ProxmoxConfig{TokenID: "user@pam!metrics", TokenSecret: "secret"})
-
-				if scenario == "list403" {
-					metrics := collectMetrics(func(ch chan<- prometheus.Metric) {
-						c.collectVMMetricsWithNodes(ch, []string{"node1"})
-					})
-					countName := "pve_node_vm_count"
-					if resType == "lxc" {
-						countName = "pve_node_lxc_count"
-					}
-					if got, ok := metricValue(metrics, countName, nil); !ok || got != 0 {
-						t.Errorf("%s = %v, found %v; want 0", countName, got, ok)
-					}
-					return
-				}
-
-				metrics := collectMetrics(func(ch chan<- prometheus.Metric) { c.collectResourceMetrics(ch, "node1", resType) })
-				prefix := "pve_vm_"
-				detailName := "balloon_bytes"
-				if resType == "lxc" {
-					prefix = "pve_lxc_"
-					detailName = "swap_used_bytes"
-				}
-				wants := map[string]float64{"memory_used_bytes": 0, "disk_read_bytes_total": 111, "disk_write_bytes_total": 222}
-				if scenario == "empty-details" {
-					wants["disk_read_bytes_total"] = 0
-					wants["disk_write_bytes_total"] = 0
-					wants[detailName] = 0
-				}
-				if scenario == "string-psi" {
-					wants[detailName] = 12
-					wants["swap_max_bytes"] = 24
-					wants["pressure_cpu_full"] = 0.25
-				}
-				for name, want := range wants {
-					if got, ok := metricValue(metrics, prefix+name, nil); !ok || got != want {
-						t.Errorf("%s = %v, found %v; want %v", prefix+name, got, ok, want)
-					}
-				}
-				if scenario == "failed-details" || scenario == "malformed-details" || scenario == "stopped" {
-					if _, ok := metricValue(metrics, prefix+detailName, nil); ok {
-						t.Errorf("unexpected %s%s after %s", prefix, detailName, scenario)
-					}
-				}
-				wantRequests := int32(1)
-				if scenario == "stopped" || scenario == "list403" {
-					wantRequests = 0
-				}
-				if got := detailRequests.Load(); got != wantRequests {
-					t.Errorf("detail requests = %d, want %d", got, wantRequests)
-				}
+				runCompatibilityGuestScenario(t, resType, scenario)
 			})
 		}
+	}
+}
+
+func runCompatibilityGuestScenario(t *testing.T, resType, scenario string) {
+	t.Helper()
+	var detailRequests atomic.Int32
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		serveCompatibilityGuestRequest(w, r, resType, scenario, &detailRequests)
+	}))
+	defer server.Close()
+	c := apiTestCollector(t, server, &config.ProxmoxConfig{TokenID: "user@pam!metrics", TokenSecret: "secret"})
+	if scenario == "list403" {
+		assertGuestListForbidden(t, c, resType)
+		return
+	}
+	metrics := collectMetrics(func(ch chan<- prometheus.Metric) { c.collectResourceMetrics(ch, "node1", resType) })
+	assertGuestScenarioMetrics(t, metrics, resType, scenario)
+	assertGuestDetailRequestCount(t, detailRequests.Load(), scenario)
+}
+
+func serveCompatibilityGuestRequest(w http.ResponseWriter, r *http.Request, resType, scenario string, detailRequests *atomic.Int32) {
+	if r.URL.Path == "/api2/json/nodes/node1/"+resType {
+		serveCompatibilityGuestList(w, scenario)
+		return
+	}
+	detailRequests.Add(1)
+	switch scenario {
+	case "failed-details":
+		http.NotFound(w, r)
+	case "malformed-details":
+		_, _ = io.WriteString(w, `{"data":`)
+	case "string-psi":
+		_, _ = io.WriteString(w, `{"data":{"diskread":999,"diskwrite":888,"swap":12,"maxswap":24,"pressurecpufull":"0.25"}}`)
+	default:
+		_, _ = io.WriteString(w, `{"data":{}}`)
+	}
+}
+
+func serveCompatibilityGuestList(w http.ResponseWriter, scenario string) {
+	if scenario == "list403" {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+	status := "running"
+	if scenario == "stopped" {
+		status = "stopped"
+	}
+	_, _ = fmt.Fprintf(w, `{"data":[{"vmid":100,"name":"guest","status":%q,"diskread":111,"diskwrite":222}]}`, status)
+}
+
+func assertGuestListForbidden(t *testing.T, c *ProxmoxCollector, resType string) {
+	t.Helper()
+	metrics := collectMetrics(func(ch chan<- prometheus.Metric) {
+		c.collectVMMetricsWithNodes(ch, []string{"node1"})
+	})
+	countName := "pve_node_vm_count"
+	if resType == "lxc" {
+		countName = "pve_node_lxc_count"
+	}
+	if got, ok := metricValue(metrics, countName, nil); !ok || got != 0 {
+		t.Errorf("%s = %v, found %v; want 0", countName, got, ok)
+	}
+}
+
+func assertGuestScenarioMetrics(t *testing.T, metrics []prometheus.Metric, resType, scenario string) {
+	t.Helper()
+	prefix, detailName := "pve_vm_", "balloon_bytes"
+	if resType == "lxc" {
+		prefix, detailName = "pve_lxc_", "swap_used_bytes"
+	}
+	wants := guestScenarioMetricWants(detailName, scenario)
+	for name, want := range wants {
+		if got, ok := metricValue(metrics, prefix+name, nil); !ok || got != want {
+			t.Errorf("%s = %v, found %v; want %v", prefix+name, got, ok, want)
+		}
+	}
+	if scenario == "failed-details" || scenario == "malformed-details" || scenario == "stopped" {
+		if _, ok := metricValue(metrics, prefix+detailName, nil); ok {
+			t.Errorf("unexpected %s%s after %s", prefix, detailName, scenario)
+		}
+	}
+}
+
+func guestScenarioMetricWants(detailName, scenario string) map[string]float64 {
+	wants := map[string]float64{"memory_used_bytes": 0, "disk_read_bytes_total": 111, "disk_write_bytes_total": 222}
+	if scenario == "empty-details" {
+		wants["disk_read_bytes_total"] = 0
+		wants["disk_write_bytes_total"] = 0
+		wants[detailName] = 0
+	}
+	if scenario == "string-psi" {
+		wants[detailName] = 12
+		wants["swap_max_bytes"] = 24
+		wants["pressure_cpu_full"] = 0.25
+	}
+	return wants
+}
+
+func assertGuestDetailRequestCount(t *testing.T, got int32, scenario string) {
+	t.Helper()
+	want := int32(1)
+	if scenario == "stopped" || scenario == "list403" {
+		want = 0
+	}
+	if got != want {
+		t.Errorf("detail requests = %d, want %d", got, want)
 	}
 }
 

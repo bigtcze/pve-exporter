@@ -364,35 +364,7 @@ func TestCompatibilityCharacterizations(t *testing.T) {
 	var requestedTasksURL string
 	var logRequests int32
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/api2/json/nodes/node1/qemu":
-			http.Error(w, "Forbidden", http.StatusForbidden)
-		case r.URL.Path == "/api2/json/nodes/node1/lxc":
-			_, _ = io.WriteString(w, `{"data":[{"vmid":200,"name":"lxc1","status":"running","diskread":500}]}`)
-		case r.URL.Path == "/api2/json/nodes/node1/lxc/200/status/current":
-			// string PSI and missing numeric fields
-			_, _ = io.WriteString(w, `{"data":{"swap":123,"pressurecpufull":"string-value"}}`)
-		case r.URL.Path == "/api2/json/cluster/ha/resources":
-			http.Error(w, "Error", http.StatusInternalServerError)
-		case r.URL.Path == "/api2/json/nodes":
-			_, _ = io.WriteString(w, `{"data":[]}`)
-		case strings.Contains(r.URL.Path, "/tasks"):
-			if strings.HasSuffix(r.URL.Path, "/tasks") {
-				requestedTasksURL = r.URL.String()
-				_, _ = io.WriteString(w, `{"data":[`+
-					`{"status":"OK","upid":"1","endtime":1},`+
-					`{"status":"OK","upid":"2","endtime":2},`+
-					`{"status":"OK","upid":"3","endtime":3},`+
-					`{"status":"OK","upid":"4","endtime":4},`+
-					`{"status":"OK","upid":"5","endtime":5},`+
-					`{"status":"OK","upid":"6","endtime":6}]}`)
-			} else if strings.HasSuffix(r.URL.Path, "/log") {
-				atomic.AddInt32(&logRequests, 1)
-				_, _ = io.WriteString(w, `{"data":[]}`)
-			}
-		default:
-			http.NotFound(w, r)
-		}
+		serveCharacterizationRequest(w, r, &requestedTasksURL, &logRequests)
 	}))
 	defer server.Close()
 	c := apiTestCollector(t, server, &config.ProxmoxConfig{TokenID: "token", TokenSecret: "secret"})
@@ -403,7 +375,6 @@ func TestCompatibilityCharacterizations(t *testing.T) {
 		c.collectClusterMetrics(ch)
 		c.collectNodeBackups("node1", 1, make(map[string]int64), &sync.Mutex{})
 	})
-
 	if val, ok := metricValue(metrics, "pve_lxc_disk_read_bytes_total", nil); !ok || val != 500 {
 		t.Errorf("expected LXC string PSI disk fallback to use aggregate 500, got %v (ok=%v)", val, ok)
 	}
@@ -411,15 +382,52 @@ func TestCompatibilityCharacterizations(t *testing.T) {
 		t.Errorf("expected LXC detail swap=123, got %v (ok=%v)", val, ok)
 	}
 
-	metricsNodes := gatherMetrics(t, c)
-	if up, ok := findMetricValue(metricsNodes, "pve_exporter_up", nil); !ok || up != 1 {
+	nodeMetrics := gatherMetrics(t, c)
+	if up, ok := findMetricValue(nodeMetrics, "pve_exporter_up", nil); !ok || up != 1 {
 		t.Errorf("expected empty /nodes to be up=1, got %v", up)
 	}
-
 	if !strings.Contains(requestedTasksURL, "limit=50") {
 		t.Errorf("expected tasks query to have limit=50, got %s", requestedTasksURL)
 	}
-	if atomic.LoadInt32(&logRequests) != 5 {
-		t.Errorf("expected maximum 5 log requests, got %d", atomic.LoadInt32(&logRequests))
+	if got := atomic.LoadInt32(&logRequests); got != 5 {
+		t.Errorf("expected maximum 5 log requests, got %d", got)
+	}
+}
+
+func serveCharacterizationRequest(w http.ResponseWriter, r *http.Request, requestedTasksURL *string, logRequests *int32) {
+	switch {
+	case r.URL.Path == "/api2/json/nodes/node1/qemu":
+		http.Error(w, "Forbidden", http.StatusForbidden)
+	case r.URL.Path == "/api2/json/nodes/node1/lxc":
+		_, _ = io.WriteString(w, `{"data":[{"vmid":200,"name":"lxc1","status":"running","diskread":500}]}`)
+	case r.URL.Path == "/api2/json/nodes/node1/lxc/200/status/current":
+		// string PSI and missing numeric fields
+		_, _ = io.WriteString(w, `{"data":{"swap":123,"pressurecpufull":"string-value"}}`)
+	case r.URL.Path == "/api2/json/cluster/ha/resources":
+		http.Error(w, "Error", http.StatusInternalServerError)
+	case r.URL.Path == "/api2/json/nodes":
+		_, _ = io.WriteString(w, `{"data":[]}`)
+	case strings.Contains(r.URL.Path, "/tasks"):
+		serveCharacterizationTaskRequest(w, r, requestedTasksURL, logRequests)
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+func serveCharacterizationTaskRequest(w http.ResponseWriter, r *http.Request, requestedTasksURL *string, logRequests *int32) {
+	if strings.HasSuffix(r.URL.Path, "/tasks") {
+		*requestedTasksURL = r.URL.String()
+		_, _ = io.WriteString(w, `{"data":[`+
+			`{"status":"OK","upid":"1","endtime":1},`+
+			`{"status":"OK","upid":"2","endtime":2},`+
+			`{"status":"OK","upid":"3","endtime":3},`+
+			`{"status":"OK","upid":"4","endtime":4},`+
+			`{"status":"OK","upid":"5","endtime":5},`+
+			`{"status":"OK","upid":"6","endtime":6}]}`)
+		return
+	}
+	if strings.HasSuffix(r.URL.Path, "/log") {
+		atomic.AddInt32(logRequests, 1)
+		_, _ = io.WriteString(w, `{"data":[]}`)
 	}
 }

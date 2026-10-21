@@ -76,22 +76,22 @@ type vmDetailResponse struct {
 }
 
 type vmDetailData struct {
-	DiskRead           float64                `json:"diskread"`
-	DiskWrite          float64                `json:"diskwrite"`
-	Balloon            float64                `json:"balloon"`
-	FreeMem            float64                `json:"freemem"`
-	PID                float64                `json:"pid"`
-	MemHost            float64                `json:"memhost"`
-	HA                 haStatus               `json:"ha"`
-	BalloonInfo        balloonInfo            `json:"ballooninfo"`
-	PressureCPUFull    float64                `json:"pressurecpufull"`
-	PressureCPUSome    float64                `json:"pressurecpusome"`
-	PressureIOFull     float64                `json:"pressureiofull"`
-	PressureIOSome     float64                `json:"pressureiosome"`
-	PressureMemoryFull float64                `json:"pressurememoryfull"`
-	PressureMemorySome float64                `json:"pressurememorysome"`
-	BlockStat          map[string]blockStats  `json:"blockstat"`
-	NICS               map[string]nicStats    `json:"nics"`
+	DiskRead           float64               `json:"diskread"`
+	DiskWrite          float64               `json:"diskwrite"`
+	Balloon            float64               `json:"balloon"`
+	FreeMem            float64               `json:"freemem"`
+	PID                float64               `json:"pid"`
+	MemHost            float64               `json:"memhost"`
+	HA                 haStatus              `json:"ha"`
+	BalloonInfo        balloonInfo           `json:"ballooninfo"`
+	PressureCPUFull    float64               `json:"pressurecpufull"`
+	PressureCPUSome    float64               `json:"pressurecpusome"`
+	PressureIOFull     float64               `json:"pressureiofull"`
+	PressureIOSome     float64               `json:"pressureiosome"`
+	PressureMemoryFull float64               `json:"pressurememoryfull"`
+	PressureMemorySome float64               `json:"pressurememorysome"`
+	BlockStat          map[string]blockStats `json:"blockstat"`
+	NICS               map[string]nicStats   `json:"nics"`
 }
 
 type haStatus struct {

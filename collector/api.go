@@ -195,13 +195,7 @@ func (c *ProxmoxCollector) apiRequest(path string) ([]byte, error) {
 			cancel()
 			return nil, err
 		}
-
-		if credentials.token {
-			req.Header.Set("Authorization", fmt.Sprintf("PVEAPIToken=%s=%s", c.config.TokenID, c.config.TokenSecret))
-		} else {
-			req.Header.Set("Cookie", fmt.Sprintf("PVEAuthCookie=%s", credentials.ticket))
-			req.Header.Set("CSRFPreventionToken", credentials.csrf)
-		}
+		c.setRequestCredentials(req, credentials)
 
 		resp, err := c.client.Do(req)
 		if err != nil {
@@ -241,6 +235,15 @@ func (c *ProxmoxCollector) apiRequest(path string) ([]byte, error) {
 	}
 
 	return nil, fmt.Errorf("max retries exceeded: %w", lastErr)
+}
+
+func (c *ProxmoxCollector) setRequestCredentials(req *http.Request, credentials requestCredentials) {
+	if credentials.token {
+		req.Header.Set("Authorization", fmt.Sprintf("PVEAPIToken=%s=%s", c.config.TokenID, c.config.TokenSecret))
+	} else {
+		req.Header.Set("Cookie", fmt.Sprintf("PVEAuthCookie=%s", credentials.ticket))
+		req.Header.Set("CSRFPreventionToken", credentials.csrf)
+	}
 }
 
 func readBoundedBody(body io.Reader) ([]byte, error) {
