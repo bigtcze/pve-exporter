@@ -1,0 +1,22 @@
+# Read the exact Go version from the existing go.mod (do not duplicate it).
+[settings]
+idiomatic_version_file_enable_tools = ["go"]
+
+[tools]
+golangci-lint = "2.15.0"
+
+[tasks.test]
+description = "Run Go regressions and race detector"
+run = "go test -race ./..."
+
+[tasks.lint]
+description = "Run pinned golangci-lint"
+run = "golangci-lint run"
+
+[tasks.build]
+description = "Build the exporter"
+run = "go build -v ."
+
+[tasks.verify]
+description = "Run the full local engineering gate"
+run = "go test -race ./... && golangci-lint run && go build -v ."

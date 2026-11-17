@@ -506,12 +506,14 @@ Import dashboard [24550 from Grafana.com](https://grafana.com/grafana/dashboards
 
 ## Development
 
-Requires Go 1.27.3 or newer and `make`. From the repository root:
+The Go toolchain is selected from `go.mod` by [mise](https://mise.jdx.dev/), while `mise.toml` pins golangci-lint. From the repository root:
 
 ```bash
-make build
-make test
+mise install
+mise run verify
 ```
+
+You can run `mise run test`, `mise run lint`, or `mise run build` separately. The existing `make build` and `make test` commands still work with an installed Go toolchain. For the engineering, metrics, security, test and release-quality contracts, start with [AGENTS.md](AGENTS.md).
 
 ## License
 
