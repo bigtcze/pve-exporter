@@ -19,18 +19,14 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v7.0.0
-        with:
-          go-version-file: go.mod
+      - name: Set up Go and golangci-lint via mise
+        uses: jdx/mise-action@v5
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v9.3.0
-        with:
-          version: v2.15.0
+        run: mise exec -- golangci-lint run
 
       - name: Run tests
-        run: go test -v -race ./...
+        run: mise exec -- go test -v -race ./...
 
       - name: Determine version
         id: version
@@ -83,9 +79,9 @@ jobs:
           mkdir -p dist
           
           # Build for multiple architectures
-          GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/pve-exporter-linux-amd64 .
-          GOOS=linux GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/pve-exporter-linux-arm64 .
-          GOOS=linux GOARCH=arm GOARM=7 go build -ldflags "$LDFLAGS" -o dist/pve-exporter-linux-armv7 .
+          GOOS=linux GOARCH=amd64 mise exec -- go build -ldflags "$LDFLAGS" -o dist/pve-exporter-linux-amd64 .
+          GOOS=linux GOARCH=arm64 mise exec -- go build -ldflags "$LDFLAGS" -o dist/pve-exporter-linux-arm64 .
+          GOOS=linux GOARCH=arm GOARM=7 mise exec -- go build -ldflags "$LDFLAGS" -o dist/pve-exporter-linux-armv7 .
           
           # Create checksums
           cd dist
