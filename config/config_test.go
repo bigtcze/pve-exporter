@@ -2,7 +2,10 @@ package config
 
 import (
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestLoadFromFile(t *testing.T) {
@@ -44,6 +47,113 @@ server:
 	}
 	if cfg.Server.ListenAddress != ":9090" {
 		t.Errorf("expected listen address ':9090', got '%s'", cfg.Server.ListenAddress)
+	}
+}
+
+func writeConfigFile(t *testing.T, content string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "config.yml")
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+func TestLoadFromFileTimeoutDuration(t *testing.T) {
+	cfg, err := LoadFromFile(writeConfigFile(t, `
+proxmox:
+  host: "pve.local"
+  password: "x"
+  timeout: 45s
+`))
+	if err != nil {
+		t.Fatalf("LoadFromFile failed: %v", err)
+	}
+	if cfg.Proxmox.Timeout != 45*time.Second {
+		t.Errorf("expected timeout 45s, got %v", cfg.Proxmox.Timeout)
+	}
+}
+
+func TestLoadFromFileTimeoutRejectsInteger(t *testing.T) {
+	_, err := LoadFromFile(writeConfigFile(t, `
+proxmox:
+  host: "pve.local"
+  password: "x"
+  timeout: 45
+`))
+	if err == nil {
+		t.Fatal("expected error for integer timeout, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to parse config file") {
+		t.Errorf("expected parse error, got %v", err)
+	}
+}
+
+func TestLoadFromFileTimeoutAutoFixesTooSmall(t *testing.T) {
+	cfg, err := LoadFromFile(writeConfigFile(t, `
+proxmox:
+  host: "pve.local"
+  password: "x"
+  timeout: 500ms
+`))
+	if err != nil {
+		t.Fatalf("LoadFromFile failed: %v", err)
+	}
+	if cfg.Proxmox.Timeout != 30*time.Second {
+		t.Errorf("expected timeout reset to 30s, got %v", cfg.Proxmox.Timeout)
+	}
+}
+
+func TestLoadFromFileIgnoresUnknownKeys(t *testing.T) {
+	cfg, err := LoadFromFile(writeConfigFile(t, `
+proxmox:
+  host: "pve.local"
+  password: "x"
+  unknown_option: true
+server:
+  listen_address: ":9333"
+  bogus: 1
+`))
+	if err != nil {
+		t.Fatalf("expected unknown keys to be ignored, got %v", err)
+	}
+	if cfg.Server.ListenAddress != ":9333" {
+		t.Errorf("expected listen address ':9333', got %q", cfg.Server.ListenAddress)
+	}
+}
+
+func TestLoadFromFileRejectsDuplicateKeys(t *testing.T) {
+	_, err := LoadFromFile(writeConfigFile(t, `
+proxmox:
+  host: "a.local"
+  host: "b.local"
+  password: "x"
+`))
+	if err == nil {
+		t.Fatal("expected duplicate key error, got nil")
+	}
+	if !strings.Contains(err.Error(), "already defined") {
+		t.Errorf("expected duplicate key message, got %v", err)
+	}
+}
+
+func TestLoadFromFileRejectsMalformedYAML(t *testing.T) {
+	_, err := LoadFromFile(writeConfigFile(t, "proxmox:\n\thost: a\n"))
+	if err == nil {
+		t.Fatal("expected malformed YAML error, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to parse config file") {
+		t.Errorf("expected parse error, got %v", err)
+	}
+}
+
+func TestLoadFromFileMissingFile(t *testing.T) {
+	_, err := LoadFromFile(filepath.Join(t.TempDir(), "absent.yml"))
+	if err == nil {
+		t.Fatal("expected error for missing file, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to read config file") {
+		t.Errorf("expected read error, got %v", err)
 	}
 }
 
