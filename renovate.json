@@ -20,6 +20,19 @@
       "enabled": true
     },
     {
+      "description": "Do not propose major updates for indirect Go modules: a new major version is a different module path that only the importing dependency can adopt",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchDepTypes": [
+        "indirect"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "enabled": false
+    },
+    {
       "description": "Track Go runtime version consumed by mise",
       "matchManagers": [
         "gomod"
