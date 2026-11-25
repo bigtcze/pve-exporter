@@ -60,9 +60,13 @@ type arcMetricHandler struct {
 	trackMisses bool // if true, also store value in misses variable
 }
 
+// arcStatsPath is the ZFS ARC kstat file. It is a variable only so tests can
+// point it at a fixture; production uses the kernel path.
+var arcStatsPath = "/proc/spl/kstat/zfs/arcstats"
+
 // collectZFSARCMetrics collects ZFS ARC metrics from /proc/spl/kstat/zfs/arcstats
 func (c *ProxmoxCollector) collectZFSARCMetrics(ch chan<- prometheus.Metric) {
-	file, err := os.Open("/proc/spl/kstat/zfs/arcstats")
+	file, err := os.Open(arcStatsPath)
 	if err != nil {
 		return
 	}

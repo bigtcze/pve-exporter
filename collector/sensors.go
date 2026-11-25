@@ -84,10 +84,15 @@ func processSensor(sensorMap map[string]interface{}) map[string]float64 {
 	return readings
 }
 
+// sensorsCommand runs `sensors -j`. It is a package variable so tests can
+// supply fixture output without executing lm-sensors.
+var sensorsCommand = func() ([]byte, error) {
+	return exec.Command("/usr/bin/sensors", "-j").Output()
+}
+
 // collectSensorsMetrics collects hardware sensor metrics using lm-sensors
 func (c *ProxmoxCollector) collectSensorsMetrics(ch chan<- prometheus.Metric) {
-	cmd := exec.Command("/usr/bin/sensors", "-j")
-	output, err := cmd.Output()
+	output, err := sensorsCommand()
 	if err != nil {
 		return
 	}

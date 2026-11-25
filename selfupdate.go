@@ -2,9 +2,11 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,6 +24,41 @@ const (
 	releaseAPI = "https://api.github.com/repos/" + repoOwner + "/" + repoName + "/releases/latest"
 )
 
+// Seams for tests. Production code never reassigns these; tests replace them
+// to point at httptest servers, temporary files and fake restart hooks. The
+// size limits protect the updater from unbounded downloads; they are variables
+// only so tests can exercise the oversize path with small bodies.
+var (
+	releaseAPIURL     = releaseAPI
+	releaseHTTPClient = &http.Client{Timeout: 30 * time.Second}
+	binaryHTTPClient  = &http.Client{Timeout: 5 * time.Minute}
+	executablePath    = getExecutablePath
+	restartHook       = restartService
+	restartCommand    = func() error {
+		return exec.Command("systemctl", "restart", "pve-exporter").Run()
+	}
+
+	maxReleaseJSONBytes int64 = 1 << 20   // 1 MiB
+	maxChecksumsBytes   int64 = 1 << 20   // 1 MiB
+	maxBinaryBytes      int64 = 256 << 20 // 256 MiB
+)
+
+// errResponseTooLarge is returned when a download exceeds its size limit.
+var errResponseTooLarge = errors.New("response exceeds size limit")
+
+// readLimited reads at most limit bytes and fails explicitly instead of
+// silently truncating when the source is larger.
+func readLimited(r io.Reader, limit int64) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(r, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > limit {
+		return nil, errResponseTooLarge
+	}
+	return data, nil
+}
+
 // GitHubRelease represents the GitHub release API response
 type GitHubRelease struct {
 	TagName string `json:"tag_name"`
@@ -33,8 +70,7 @@ type GitHubRelease struct {
 
 // CheckLatestVersion queries GitHub API for the latest release
 func CheckLatestVersion() (*GitHubRelease, error) {
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Get(releaseAPI)
+	resp, err := releaseHTTPClient.Get(releaseAPIURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query GitHub API: %w", err)
 	}
@@ -44,8 +80,13 @@ func CheckLatestVersion() (*GitHubRelease, error) {
 		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
 	}
 
+	body, err := readLimited(resp.Body, maxReleaseJSONBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read GitHub response: %w", err)
+	}
+
 	var release GitHubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+	if err := json.Unmarshal(body, &release); err != nil {
 		return nil, fmt.Errorf("failed to parse GitHub response: %w", err)
 	}
 
@@ -125,8 +166,7 @@ func getExecutablePath() (string, error) {
 
 // downloadBinary downloads a binary from URL to a temp file
 func downloadBinary(downloadURL, execPath string) (string, error) {
-	client := &http.Client{Timeout: 5 * time.Minute}
-	resp, err := client.Get(downloadURL)
+	resp, err := binaryHTTPClient.Get(downloadURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to download binary: %w", err)
 	}
@@ -142,13 +182,18 @@ func downloadBinary(downloadURL, execPath string) (string, error) {
 	}
 	tmpPath := tmpFile.Name()
 
-	_, err = io.Copy(tmpFile, resp.Body)
+	// Copy at most maxBinaryBytes+1 so an oversize body is detected, not truncated.
+	n, err := io.Copy(tmpFile, io.LimitReader(resp.Body, maxBinaryBytes+1))
 	_ = tmpFile.Close()
+	if err == nil && n > maxBinaryBytes {
+		err = errResponseTooLarge
+	}
 	if err != nil {
 		_ = os.Remove(tmpPath)
 		return "", fmt.Errorf("failed to write binary: %w", err)
 	}
 
+	// #nosec G302 -- 0755 is required: the downloaded file must be an executable binary that the service runs
 	if err := os.Chmod(tmpPath, 0755); err != nil {
 		_ = os.Remove(tmpPath)
 		return "", fmt.Errorf("failed to chmod binary: %w", err)
@@ -175,6 +220,7 @@ func verifyBinary(tmpPath string) error {
 	}
 
 	// Check if file is executable using 'file' command
+	// #nosec G204 -- fixed executable with no shell; tmpPath is the temp file this process just created
 	cmd = exec.Command("file", tmpPath)
 	fileOutput, _ := cmd.Output()
 	if strings.Contains(string(fileOutput), "executable") {
@@ -206,8 +252,7 @@ func replaceExecutable(execPath, tmpPath string) error {
 // restartService attempts to restart the pve-exporter systemd service
 func restartService() {
 	fmt.Println("Restarting service...")
-	cmd := exec.Command("systemctl", "restart", "pve-exporter")
-	if err := cmd.Run(); err != nil {
+	if err := restartCommand(); err != nil {
 		fmt.Printf("Warning: Failed to restart service: %v\n", err)
 		fmt.Println("Please restart manually: systemctl restart pve-exporter")
 		return
@@ -228,8 +273,7 @@ func downloadChecksums(release *GitHubRelease) (map[string]string, error) {
 		return nil, fmt.Errorf("checksums.txt not found in release assets")
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Get(checksumURL)
+	resp, err := releaseHTTPClient.Get(checksumURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download checksums: %w", err)
 	}
@@ -239,8 +283,13 @@ func downloadChecksums(release *GitHubRelease) (map[string]string, error) {
 		return nil, fmt.Errorf("checksums download failed with status %d", resp.StatusCode)
 	}
 
+	body, err := readLimited(resp.Body, maxChecksumsBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read checksums: %w", err)
+	}
+
 	checksums := make(map[string]string)
-	scanner := bufio.NewScanner(resp.Body)
+	scanner := bufio.NewScanner(bytes.NewReader(body))
 	for scanner.Scan() {
 		line := scanner.Text()
 		parts := strings.Fields(line)
@@ -253,6 +302,7 @@ func downloadChecksums(release *GitHubRelease) (map[string]string, error) {
 
 // verifyChecksum verifies the SHA256 checksum of a file
 func verifyChecksum(filePath, expectedHash string) error {
+	// #nosec G304 -- filePath is the temp download path created by downloadBinary, not user input
 	f, err := os.Open(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to open file for checksum: %w", err)
@@ -295,7 +345,7 @@ func SelfUpdate(currentVersion string) error {
 
 	fmt.Printf("Downloading %s...\n", getBinaryName())
 
-	execPath, err := getExecutablePath()
+	execPath, err := executablePath()
 	if err != nil {
 		return err
 	}
@@ -335,6 +385,6 @@ func SelfUpdate(currentVersion string) error {
 	}
 
 	fmt.Println("Update successful!")
-	restartService()
+	restartHook()
 	return nil
 }

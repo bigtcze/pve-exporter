@@ -1,6 +1,11 @@
 # Proxmox VE Exporter
-[![GitHub release](https://img.shields.io/github/release/bigtcze/pve-exporter.svg)](https://github.com/bigtcze/pve-exporter/releases)
-[![License](https://img.shields.io/github/license/bigtcze/pve-exporter.svg)](LICENSE)
+
+<p align="center">
+  <a href="https://github.com/bigtcze/pve-exporter/actions/workflows/ci.yml"><img src="https://github.com/bigtcze/pve-exporter/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/bigtcze/pve-exporter"><img src="https://api.scorecard.dev/projects/github.com/bigtcze/pve-exporter/badge" alt="OpenSSF Scorecard"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/bigtcze/pve-exporter.svg" alt="License"></a>
+  <a href="https://github.com/bigtcze/pve-exporter/releases"><img src="https://img.shields.io/github/release/bigtcze/pve-exporter.svg" alt="GitHub release"></a>
+</p>
 
 Prometheus exporter for Proxmox VE API metrics and local host hardware metrics, written in Go.
 
@@ -8,11 +13,14 @@ Prometheus exporter for Proxmox VE API metrics and local host hardware metrics, 
 
 - [Systemd Installation](#systemd-installation)
 - [Updating](#updating)
+- [Verifying Release Artifacts](#verifying-release-artifacts)
 - [Configuration](#configuration)
 - [Local Hardware Setup](#local-hardware-setup)
 - [Metrics](#metrics)
 - [Grafana Dashboard](#grafana-dashboard)
+- [Security](#security)
 - [Development](#development)
+- [Contributing and Governance](#contributing-and-governance)
 - [License](#license)
 
 ## Systemd Installation
@@ -202,6 +210,36 @@ curl -fsS http://localhost:9221/metrics | grep '^pve_exporter_build_info{'
 ```
 
 Confirm the `version` label matches the intended release. `-version` reports the binary on disk, not necessarily the version still running in the service. If the automatic restart failed, run `sudo systemctl restart pve-exporter` and check again. Manual replacement also retains no rollback backup; an older release can be installed using the same matching-asset/checksum procedure.
+
+## Verifying Release Artifacts
+
+Each release publishes `pve-exporter-linux-amd64`, `pve-exporter-linux-arm64`, `pve-exporter-linux-armv7`, and `checksums.txt`. Self-update and the manual update steps above both check the binary's SHA256 against that release's `checksums.txt`.
+
+To check a download yourself, run this in the directory that holds the binary and its `checksums.txt`, replacing the asset name with the one you downloaded:
+
+```bash
+grep "  pve-exporter-linux-amd64$" checksums.txt | sha256sum --check --strict -
+```
+
+This confirms that the file matches the checksum list. Both files come from the same release, so this check alone does not show who published them.
+
+Releases built after the build-provenance change carry a GitHub artifact attestation (Sigstore-backed build provenance). Older releases, including v1.14.4, have none. For a release that has one, verify the downloaded binary with the GitHub CLI:
+
+```bash
+gh attestation verify pve-exporter-linux-amd64 --repo bigtcze/pve-exporter
+```
+
+Release binaries are built by [`scripts/build-release.sh`](scripts/build-release.sh) with `CGO_ENABLED=0`, `-trimpath`, `-buildvcs=false`, and a build date taken from the commit time. To rebuild a tag locally with the Go version from `go.mod`:
+
+```bash
+git clone --branch vX.Y.Z https://github.com/bigtcze/pve-exporter.git
+cd pve-exporter
+mise install
+mise exec -- scripts/build-release.sh vX.Y.Z /tmp/pve-exporter-rebuild
+diff /tmp/pve-exporter-rebuild/checksums.txt /path/to/downloaded/checksums.txt
+```
+
+Releases published before this static build change were built with the default CGO setting. For example, the v1.14.4 amd64 binary is dynamically linked, so it will not match a rebuild. Whether a CI-built release matches a local rebuild has not been confirmed yet.
 
 ## Configuration
 
@@ -504,6 +542,14 @@ Labels: `node`, `device`, `model`, `serial`, `type`. These metrics require the l
 
 Import dashboard [24550 from Grafana.com](https://grafana.com/grafana/dashboards/24550), or import [`grafana/pve-exporter.json`](grafana/pve-exporter.json).
 
+## Security
+
+- The metrics endpoint (`/metrics`, `/health`, and the root page) is plain HTTP with no authentication. Bind `LISTEN_ADDRESS` to a trusted interface, restrict the port with a firewall to your Prometheus host, or place it behind a reverse proxy that terminates TLS and authenticates clients.
+- The exporter connects to the Proxmox API over HTTPS but does not verify its certificate by default (`proxmox.insecure_skip_verify: true`). Set `insecure_skip_verify: false` and trust your Proxmox CA when you can.
+- Keep the configuration file readable only by the service group. The installation steps above create it with mode `0640`.
+- Report suspected vulnerabilities privately, as described in [SECURITY.md](SECURITY.md).
+- The [threat model](docs/security/threat-model.md) lists assets, trust boundaries, mitigations and residual risks. The [OpenSSF readiness assessment](docs/security/openssf-readiness.md) tracks project-level security criteria.
+
 ## Development
 
 The Go toolchain is selected from `go.mod` by [mise](https://mise.jdx.dev/), while `mise.toml` pins golangci-lint. From the repository root:
@@ -513,7 +559,14 @@ mise install
 mise run verify
 ```
 
-You can run `mise run test`, `mise run lint`, or `mise run build` separately. The existing `make build` and `make test` commands still work with an installed Go toolchain. For the engineering, metrics, security, test and release-quality contracts, start with [AGENTS.md](AGENTS.md).
+`mise run verify` runs these tasks in order: `coverage` (race tests with the 80% statement gate), `lint`, `security` (gosec, govulncheck and gitleaks), `build`, and `repro` (a two-build reproducibility check). You can run each one separately, for example `mise run test`, `mise run lint`, or `mise run build`. The existing `make build` and `make test` commands still work with an installed Go toolchain. For the engineering, metrics, security, test and release-quality contracts, start with [AGENTS.md](AGENTS.md). Contribution rules are in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Contributing and Governance
+
+- [CONTRIBUTING.md](CONTRIBUTING.md): reporting bugs, opening pull requests, coding and testing requirements.
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): community standards and how to report conduct concerns.
+- [GOVERNANCE.md](GOVERNANCE.md): maintainership, decision making and releases.
+- [docs/ROADMAP.md](docs/ROADMAP.md): maintenance priorities and known limitations.
 
 ## License
 

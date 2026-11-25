@@ -33,6 +33,38 @@ func newMetricsHandler(reg prometheus.Gatherer) http.Handler {
 	})
 }
 
+// newServeMux wires the metrics, health and informational root endpoints.
+func newServeMux(metricsPath string, reg prometheus.Gatherer) *http.ServeMux {
+	mux := http.NewServeMux()
+
+	// Metrics endpoint
+	mux.Handle(metricsPath, newMetricsHandler(reg))
+
+	// Health endpoint
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprintf(w, "OK\n")
+	})
+
+	// Root endpoint with info
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = fmt.Fprintf(w, `<html>
+<head><title>Proxmox Exporter</title></head>
+<body>
+<h1>Proxmox Exporter</h1>
+<p>Version: %s</p>
+<p>Commit: %s</p>
+<p>Build Date: %s</p>
+<p><a href="%s">Metrics</a></p>
+<p><a href="/health">Health</a></p>
+</body>
+</html>`, version, commit, date, metricsPath)
+	})
+
+	return mux
+}
+
 func main() {
 	// CLI flags
 	showVersion := flag.Bool("version", false, "Print version and exit")
@@ -80,32 +112,7 @@ func main() {
 	registry.MustRegister(proxmoxCollector)
 
 	// Setup HTTP server
-	mux := http.NewServeMux()
-
-	// Metrics endpoint
-	mux.Handle(cfg.Server.MetricsPath, newMetricsHandler(registry))
-
-	// Health endpoint
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = fmt.Fprintf(w, "OK\n")
-	})
-
-	// Root endpoint with info
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		_, _ = fmt.Fprintf(w, `<html>
-<head><title>Proxmox Exporter</title></head>
-<body>
-<h1>Proxmox Exporter</h1>
-<p>Version: %s</p>
-<p>Commit: %s</p>
-<p>Build Date: %s</p>
-<p><a href="%s">Metrics</a></p>
-<p><a href="/health">Health</a></p>
-</body>
-</html>`, version, commit, date, cfg.Server.MetricsPath)
-	})
+	mux := newServeMux(cfg.Server.MetricsPath, registry)
 
 	// Start HTTP server
 	server := &http.Server{

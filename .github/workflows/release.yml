@@ -7,92 +7,99 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: read
+
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      
+      id-token: write
+      attestations: write
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7.0.1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Set up Go and golangci-lint via mise
-        uses: jdx/mise-action@v5.3.0
+      - name: Set up Go and tools via mise
+        uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
 
       - name: Run golangci-lint
         run: mise exec -- golangci-lint run
 
       - name: Run tests
-        run: mise exec -- go test -v -race ./...
+        run: mise exec -- go test -race ./...
 
       - name: Determine version
         id: version
+        env:
+          GITHUB_REF_NAME_FOR_VERSION: ${{ github.ref }}
         run: |
-          if [[ $GITHUB_REF == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
+          if [[ "$GITHUB_REF_NAME_FOR_VERSION" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF_NAME_FOR_VERSION#refs/tags/}
           else
             VERSION="v0.0.0-$(git rev-parse --short HEAD)"
           fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Version: $VERSION"
 
       - name: Extract release notes from tag
         if: startsWith(github.ref, 'refs/tags/')
         id: release_notes
+        env:
+          GITHUB_REF_FOR_NOTES: ${{ github.ref }}
         run: |
-          TAG_NAME=${GITHUB_REF#refs/tags/}
+          TAG_NAME=${GITHUB_REF_FOR_NOTES#refs/tags/}
           echo "Processing tag: $TAG_NAME"
-          
+
           # Force fetch tags to ensure we have the tag object locally
           git fetch --tags --force
-          
+
           # Use for-each-ref for precise extraction of annotated tag content
-          RELEASE_NAME=$(git for-each-ref refs/tags/$TAG_NAME --format='%(contents:subject)')
-          RELEASE_BODY=$(git for-each-ref refs/tags/$TAG_NAME --format='%(contents:body)')
-          
+          RELEASE_NAME=$(git for-each-ref "refs/tags/$TAG_NAME" --format='%(contents:subject)')
+          RELEASE_BODY=$(git for-each-ref "refs/tags/$TAG_NAME" --format='%(contents:body)')
+
           # If no body (e.g. lightweight tag or empty body), use subject
           if [ -z "$RELEASE_BODY" ]; then
              echo "Warning: No release body found. Using subject."
              RELEASE_BODY="$RELEASE_NAME"
           fi
-          
-          echo "Extracted Name: $RELEASE_NAME"
-          
-          echo "name=$RELEASE_NAME" >> $GITHUB_OUTPUT
-          
-          echo "body<<EOF" >> $GITHUB_OUTPUT
-          echo "$RELEASE_BODY" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Build binaries
-        run: |
-          VERSION=${{ steps.version.outputs.version }}
-          COMMIT=$(git rev-parse --short HEAD)
-          DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          
-          LDFLAGS="-X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE} -w -s"
-          
-          # Create dist directory
-          mkdir -p dist
-          
-          # Build for multiple architectures
-          GOOS=linux GOARCH=amd64 mise exec -- go build -ldflags "$LDFLAGS" -o dist/pve-exporter-linux-amd64 .
-          GOOS=linux GOARCH=arm64 mise exec -- go build -ldflags "$LDFLAGS" -o dist/pve-exporter-linux-arm64 .
-          GOOS=linux GOARCH=arm GOARM=7 mise exec -- go build -ldflags "$LDFLAGS" -o dist/pve-exporter-linux-armv7 .
-          
-          # Create checksums
-          cd dist
-          sha256sum * > checksums.txt
+          echo "Extracted Name: $RELEASE_NAME"
+
+          echo "name=$RELEASE_NAME" >> "$GITHUB_OUTPUT"
+
+          echo "body<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$RELEASE_BODY" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Build binaries and checksums
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: mise exec -- scripts/build-release.sh "$RELEASE_VERSION" dist
+
+      - name: Attest build provenance
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            dist/pve-exporter-linux-amd64
+            dist/pve-exporter-linux-arm64
+            dist/pve-exporter-linux-armv7
+            dist/checksums.txt
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v3.0.4
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           files: |
-            dist/pve-exporter-*
+            dist/pve-exporter-linux-amd64
+            dist/pve-exporter-linux-arm64
+            dist/pve-exporter-linux-armv7
             dist/checksums.txt
           name: ${{ steps.release_notes.outputs.name }}
           body: ${{ steps.release_notes.outputs.body }}
@@ -100,4 +107,3 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
