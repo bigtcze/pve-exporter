@@ -20,7 +20,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Go and golangci-lint via mise
-        uses: jdx/mise-action@v5
+        uses: jdx/mise-action@v5.3.0
 
       - name: Run golangci-lint
         run: mise exec -- golangci-lint run
@@ -89,7 +89,7 @@ jobs:
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@v3.0.4
         with:
           files: |
             dist/pve-exporter-*
