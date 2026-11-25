@@ -59,6 +59,7 @@ func LoadFromFile(configFile string) (*Config, error) {
 
 	// Load from file if specified
 	if configFile != "" {
+		// #nosec G304 -- configFile is the operator-supplied --config flag; reading it is the intended behaviour
 		data, err := os.ReadFile(configFile)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read config file: %w", err)

@@ -4,10 +4,20 @@ idiomatic_version_file_enable_tools = ["go"]
 
 [tools]
 golangci-lint = "2.15.0"
+"aqua:securego/gosec" = "2.30.0"
+"aqua:gitleaks/gitleaks" = "8.30.1"
+"go:golang.org/x/vuln/cmd/govulncheck" = "1.9.0"
 
 [tasks.test]
 description = "Run Go regressions and race detector"
 run = "go test -race ./..."
+
+[tasks.coverage]
+description = "Run race tests with coverage and enforce the 80% statement gate"
+run = """
+go test -race -covermode=atomic -coverprofile=coverage.out ./...
+scripts/check-coverage.sh coverage.out 80
+"""
 
 [tasks.lint]
 description = "Run pinned golangci-lint"
@@ -17,6 +27,24 @@ run = "golangci-lint run"
 description = "Build the exporter"
 run = "go build -v ."
 
+[tasks.security]
+description = "Run gosec, govulncheck and gitleaks"
+run = """
+gosec ./...
+govulncheck ./...
+gitleaks git --redact .
+"""
+
+[tasks.repro]
+description = "Verify byte-identical release binaries from two source trees"
+run = "scripts/check-reproducible.sh"
+
 [tasks.verify]
 description = "Run the full local engineering gate"
-run = "go test -race ./... && golangci-lint run && go build -v ."
+run = """
+mise run coverage
+mise run lint
+mise run security
+mise run build
+mise run repro
+"""

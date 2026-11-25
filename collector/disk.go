@@ -12,16 +12,21 @@ import (
 )
 
 const (
-	// Default path for SMART data JSON file
-	smartDataPath = "/var/lib/pve-exporter/smart.json"
 	// Maximum age of SMART data file before considering it stale (10 minutes = 2x cron interval)
 	smartDataMaxAge = 10 * time.Minute
-	// Path to diskstats
-	diskstatsPath = "/proc/diskstats"
 	// Sector size in bytes (standard Linux sector size)
 	sectorSizeBytes = 512
 	// Milliseconds per second
 	msPerSecond = 1000
+)
+
+// Paths read by the local hardware collectors. They are variables only so
+// tests can point them at fixtures; production values are the defaults.
+var (
+	// Default path for SMART data JSON file
+	smartDataPath = "/var/lib/pve-exporter/smart.json"
+	// Path to diskstats
+	diskstatsPath = "/proc/diskstats"
 )
 
 // SmartData represents the JSON structure from pve-smart-collector.sh

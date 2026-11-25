@@ -225,6 +225,7 @@ func NewProxmoxCollector(cfg *config.ProxmoxConfig, logger *slog.Logger) *Proxmo
 		Timeout: cfg.Timeout,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
+				// #nosec G402 -- documented compatibility default for self-signed Proxmox certificates; operators opt into verification with insecure_skip_verify: false
 				InsecureSkipVerify: cfg.InsecureSkipVerify,
 			},
 			MaxIdleConns:        maxIdleConns,
