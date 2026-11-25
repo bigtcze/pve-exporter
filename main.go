@@ -24,6 +24,15 @@ var (
 	date    = "unknown"
 )
 
+// newMetricsHandler returns the /metrics handler. Content negotiation (text,
+// OpenMetrics when enabled, protobuf) is delegated to promhttp and expfmt.
+func newMetricsHandler(reg prometheus.Gatherer) http.Handler {
+	return promhttp.HandlerFor(reg, promhttp.HandlerOpts{
+		ErrorLog:      log.New(os.Stderr, "", log.LstdFlags),
+		ErrorHandling: promhttp.ContinueOnError,
+	})
+}
+
 func main() {
 	// CLI flags
 	showVersion := flag.Bool("version", false, "Print version and exit")
@@ -74,10 +83,7 @@ func main() {
 	mux := http.NewServeMux()
 
 	// Metrics endpoint
-	mux.Handle(cfg.Server.MetricsPath, promhttp.HandlerFor(registry, promhttp.HandlerOpts{
-		ErrorLog:      log.New(os.Stderr, "", log.LstdFlags),
-		ErrorHandling: promhttp.ContinueOnError,
-	}))
+	mux.Handle(cfg.Server.MetricsPath, newMetricsHandler(registry))
 
 	// Health endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
