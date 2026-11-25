@@ -157,11 +157,17 @@ func getExecutablePath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get executable path: %w", err)
 	}
-	execPath, err = filepath.EvalSymlinks(execPath)
+	return resolveExecutablePath(execPath)
+}
+
+// resolveExecutablePath resolves symlinks in execPath so the replacement
+// targets the real file, not the link.
+func resolveExecutablePath(execPath string) (string, error) {
+	resolved, err := filepath.EvalSymlinks(execPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve executable path: %w", err)
 	}
-	return execPath, nil
+	return resolved, nil
 }
 
 // downloadBinary downloads a binary from URL to a temp file

@@ -2,7 +2,7 @@
 
 This document describes the security assumptions, trust boundaries, and mitigations of pve-exporter as implemented on branch `feat/openssf-readiness-11` (pre-merge). It is an assurance aid for operators and reviewers. Each mitigation is traced to code and to tests. It does not claim that the project is certified or independently audited.
 
-Compatibility: this document describes existing behaviour. Phase 1 of issue #11 changed the self-update and release build code (size limits, reproducible static builds); no published metric, configuration key, CLI flag or asset name changed.
+Compatibility: this document describes existing behaviour. Issue #11 changed the self-update and release build code (size limits, reproducible static builds); no published metric, configuration key, CLI flag or asset name changed.
 
 ## Assets
 
@@ -51,7 +51,7 @@ Compatibility: this document describes existing behaviour. Phase 1 of issue #11 
 - `proxmox.insecure_skip_verify` defaults to **`true`** (`config/config.go`, `PVE_INSECURE_SKIP_VERIFY`), so self-signed Proxmox certificates work out of the box. The HTTP client sets `InsecureSkipVerify` from this value (`collector/collector.go`, `NewProxmoxCollector`).
 - The exporter logs a startup warning when verification is disabled (`main.go`: "TLS certificate verification is disabled, this is insecure for production use").
 - Recommended: set `insecure_skip_verify: false` and trust the Proxmox CA on the exporter host.
-- Tests: the httptest TLS servers in `collector/api_test.go` and `collector/mock_test.go` set `InsecureSkipVerify` explicitly so they can use self-signed certificates. The tests I checked do not assert the default value, and none connects to a server with a verified certificate chain.
+- Tests: the httptest TLS servers in `collector/api_test.go` and `collector/mock_test.go` set `InsecureSkipVerify` explicitly so they can use self-signed certificates. No test asserts the default value, and none connects to a server with a verified certificate chain.
 - **Residual risk:** the default permits a man-in-the-middle on the exporter→Proxmox path. It is a documented compatibility trade-off (gosec G402 is suppressed with this justification in `collector/collector.go`).
 
 ### 4. Unauthenticated plain-HTTP metrics endpoint
@@ -90,10 +90,10 @@ Compatibility: this document describes existing behaviour. Phase 1 of issue #11 
 
 ### 9. Self-update: filesystem, symlinks and temporary files
 
-- The executable path is resolved with `filepath.EvalSymlinks` (`getExecutablePath`), so the symlink target is replaced, not the link.
+- The executable path is resolved with `filepath.EvalSymlinks` (`getExecutablePath`, via `resolveExecutablePath`), so the symlink target is replaced, not the link. `TestResolveExecutablePathFollowsSymlink` checks this with a temporary symlink.
 - The download goes to a temporary file created in the **same directory** as the executable (`os.CreateTemp`), so the final step is a same-filesystem `os.Rename`. The new file is `chmod 0755` (gosec G302 is suppressed with this justification).
 - On checksum or validation failure, the temporary file is removed. The original executable is renamed to `.bak`, the new file is renamed into place, and the backup is removed on success. If the install step fails, the backup is restored (`replaceExecutable`).
-- Tests (`selfupdate_test.go`): `TestDownloadBinary` (temp file location, cleanup on non-200 and oversize), `TestReplaceExecutable` (success, restore on install failure, backup failure), `TestSelfUpdateFailurePaths` and `TestSelfUpdateNegativePaths` (the original executable is byte-identical and no temporary files remain after failures), and `TestGetExecutablePathResolves`.
+- Tests (`selfupdate_test.go`): `TestDownloadBinary` (temp file location, cleanup on non-200 and oversize), `TestReplaceExecutable` (success, restore on install failure, backup failure), `TestSelfUpdateFailurePaths` and `TestSelfUpdateNegativePaths` (the original executable is byte-identical and no temporary files remain after failures), `TestResolveExecutablePathFollowsSymlink` and `TestResolveExecutablePathMissingFile` (symlink resolution and error path), and `TestGetExecutablePathResolves` (absolute path of the running test binary).
 - **Residual risk:** there is no rollback copy after success; the `.bak` is deleted. Restoring an older release is a manual step documented in the README.
 
 ### 10. Self-update integrity
@@ -107,7 +107,7 @@ Compatibility: this document describes existing behaviour. Phase 1 of issue #11 
 ### 11. Release artifacts and build pipeline
 
 - Release binaries are built with `CGO_ENABLED=0`, `-trimpath`, `-buildvcs=false` and fixed build metadata by `scripts/build-release.sh`. `scripts/check-reproducible.sh` compares two independent builds. Releases built after this change are attested with `actions/attest-build-provenance`.
-- Workflow permissions are read-only by default; the release job requests write access only for release creation and attestation. Third-party actions are pinned to full commit SHAs. Dependency vulnerabilities are checked with `govulncheck` (CI `security` job); static analysis with `gosec`; secret leakage with `gitleaks`.
+- Workflow permissions are read-only by default. The `build` job is read-only; the `release` job, which runs only for `v*` tags, requests `contents: write`, `id-token: write` and `attestations: write` for release creation and attestation. Third-party actions are pinned to full commit SHAs. Dependency vulnerabilities are checked with `govulncheck` (CI `security` job); static analysis with `gosec`; secret leakage with `gitleaks`.
 - **Residual risk:** tags are annotated but **not GPG-signed**, and releases published before this change were not reproducible or attested.
 
 ### 12. Secrets in source control
@@ -129,4 +129,4 @@ Compatibility: this document describes existing behaviour. Phase 1 of issue #11 
 
 ## Compatibility
 
-This document changes no published behaviour. Security-relevant behaviour changes made under issue #11 are the bounded self-update downloads and the static release build; both are described in the README and in the release notes for the release that includes them.
+This document changes no published behaviour. Security-relevant behaviour changes made under issue #11 are the bounded self-update downloads and the static release build; both are described in the README. Listing them in the release notes of the release that includes them is an owner action, not yet a repository guarantee.

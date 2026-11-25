@@ -235,11 +235,11 @@ Release binaries are built by [`scripts/build-release.sh`](scripts/build-release
 git clone --branch vX.Y.Z https://github.com/bigtcze/pve-exporter.git
 cd pve-exporter
 mise install
-mise exec -- scripts/build-release.sh vX.Y.Z /tmp/pve-exporter-rebuild
-diff /tmp/pve-exporter-rebuild/checksums.txt /path/to/downloaded/checksums.txt
+mise exec -- scripts/build-release.sh vX.Y.Z "$HOME/pve-exporter-rebuild"
+diff "$HOME/pve-exporter-rebuild/checksums.txt" /path/to/downloaded/checksums.txt
 ```
 
-Releases published before this static build change were built with the default CGO setting. For example, the v1.14.4 amd64 binary is dynamically linked, so it will not match a rebuild. Whether a CI-built release matches a local rebuild has not been confirmed yet.
+Releases published before this static build change were built with the default CGO setting. For example, the v1.14.4 amd64 binary is dynamically linked, so it will not match a rebuild. Only the amd64 binary changes from dynamically linked to static; arm64 and armv7 were already effectively static. The pure-Go resolver no longer uses glibc NSS modules (such as mdns, LDAP or nss-resolve), so operators who rely on them should use an IP address or a name that `/etc/hosts` or DNS can resolve. Whether a CI-built release matches a local rebuild has not been confirmed yet.
 
 ## Configuration
 

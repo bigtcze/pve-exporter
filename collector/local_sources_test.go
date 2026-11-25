@@ -286,6 +286,23 @@ func TestSmartStaleFileIsSkipped(t *testing.T) {
 	}
 }
 
+func TestSmartUnreadableFileEmitsNothing(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root bypasses file permissions; the unreadable-file case cannot be simulated")
+	}
+	path := writeTestFile(t, "smart.json", smartFixture)
+	if err := os.Chmod(path, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(path, 0o600) })
+	setSmartPaths(t, path, filepath.Join(t.TempDir(), "absent"))
+	c := newLocalCollector(t)
+	metrics := collectMetrics(func(ch chan<- prometheus.Metric) { c.collectSmartMetrics(ch) })
+	if len(metrics) != 0 {
+		t.Fatalf("unreadable SMART file emitted %d metrics", len(metrics))
+	}
+}
+
 func TestSmartMalformedJSONEmitsNothing(t *testing.T) {
 	path := writeTestFile(t, "smart.json", `{"hostname": "pve1", "disks": [`)
 	setSmartPaths(t, path, filepath.Join(t.TempDir(), "absent"))

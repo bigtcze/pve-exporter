@@ -26,7 +26,7 @@ cd "$repo_root"
 
 commit="$(git rev-parse --short HEAD)"
 # Commit time in UTC, so the same commit always yields the same date.
-build_date="$(TZ=UTC git log -1 --format=%cd --date=format:%Y-%m-%dT%H:%M:%SZ HEAD)"
+build_date="$(TZ=UTC git log -1 --format=%cd --date=format-local:%Y-%m-%dT%H:%M:%SZ HEAD)"
 
 ldflags="-s -w -X main.version=${version} -X main.commit=${commit} -X main.date=${build_date}"
 

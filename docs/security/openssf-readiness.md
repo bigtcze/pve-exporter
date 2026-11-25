@@ -6,9 +6,9 @@
 
 | Source | Version or date | Used for |
 |--------|-----------------|----------|
-| OpenSSF Best Practices criteria, [`criteria/criteria.yml`](https://github.com/coreinfrastructure/best-practices-badge/blob/main/criteria/criteria.yml) | fetched 2026-11-25 | Passing (67 IDs) and Silver (55 IDs) lists, with the level shown for each list |
-| OpenSSF Baseline (OSPS), Level 1 requirements | v2026.08.28 (baseline repo commit `0ffc682`) | 25 Level-1 entries; `OSPS-BR-01.02` is retired upstream and is listed as N/A |
-| OpenSSF Best Practices official criterion text, en locale (`config/locales/en.yml` in coreinfrastructure/best-practices-badge; blob `c0ed63d`, checked via gh API) | local copy `/tmp/opencode/bp-en.yml`, fetched 2026-11-25 | Official wording for `delivery_unsigned`, `achieve_passing`, `crypto_certificate_verification` and `crypto_verification_private`. The local copy was not hash-compared with the upstream blob. |
+| OpenSSF Best Practices criteria, [`criteria/criteria.yml` at 880f1cb](https://github.com/coreinfrastructure/best-practices-badge/blob/880f1cb943a815f4418980391360d47e707321fa/criteria/criteria.yml) (blob `7804ec1`) | upstream commit `880f1cb`, checked 2026-11-25 | Passing (67 IDs) and Silver (55 IDs) lists, with the level shown for each list |
+| OpenSSF Baseline (OSPS), Level 1 requirements, [ossf/security-baseline tag `v2026.08.28`](https://github.com/ossf/security-baseline/releases/tag/v2026.08.28) | tag `v2026.08.28` (commit `0ffc682`) | 25 Level-1 entries; `OSPS-BR-01.02` is retired upstream and is listed as N/A |
+| OpenSSF Best Practices official criterion text, [`config/locales/en.yml` at 5ea0f48](https://github.com/coreinfrastructure/best-practices-badge/blob/5ea0f484ea2e4d56a8149c490b4d109d18e85f28/config/locales/en.yml) (blob `c0ed63d`) | upstream commit `5ea0f48`, checked 2026-11-25 | Official wording for the criterion rows cited with "(bp-en.yml)" in the tables, including `delivery_unsigned`, `achieve_passing`, `crypto_certificate_verification`, `crypto_verification_private` and `automated_integration_testing`. |
 | Scorecard | Not run locally; the `scorecard.yml` workflow runs weekly and on pushes to `main` | Automated Scorecard checks (results appear after merge) |
 
 Level notes: the level for each ID is taken from the Passing or Silver list it belongs to (the criteria file reuses some IDs in both lists, with different levels). An ID that appears in both tables is therefore assessed twice, once per list. The criterion text itself is not restated; the ID is the key.
@@ -26,7 +26,7 @@ Scope of the criteria: the Best Practices badge is not awarded until the project
 ## Summary
 
 - Passing (67 IDs): Met 51, Partial 8, Unmet 1, Owner 2, N/A 5.
-- Silver (55 IDs): Met 34, Partial 7, Unmet 6, Owner 1, N/A 7.
+- Silver (55 IDs): Met 36, Partial 5, Unmet 6, Owner 1, N/A 7.
 - OSPS Baseline Level 1 (25 IDs): Met 17, Partial 3, Unmet 1, Owner 2, N/A 2.
 
 Passing and Silver tables include every ID from the lists, so a criterion missing from a table is a bug in this document.
@@ -80,8 +80,6 @@ Requirements at MUST level whose status is not **Met** (Unmet, Partial or Owner)
 | Silver | `achieve_passing` | Unmet |
 | Silver | `access_continuity` | Unmet |
 | Silver | `documentation_achievements` | Partial |
-| Silver | `coding_standards_enforced` | Partial |
-| Silver | `automated_integration_testing` | Partial |
 | Silver | `regression_tests_added50` | Partial |
 | Silver | `warnings_strict` | Partial |
 | Silver | `crypto_certificate_verification` | Unmet |
@@ -94,7 +92,7 @@ Requirements at MUST level whose status is not **Met** (Unmet, Partial or Owner)
 | OSPS L1 | `OSPS-QA-05.01` | Partial |
 | OSPS L1 | `OSPS-QA-05.02` | Partial |
 
-Count: 23 MUST-level items are not Met.
+Count: 21 MUST-level items are not Met.
 
 ## Dependency licenses
 
@@ -110,7 +108,7 @@ Modules linked into the release binary, from `go list -deps` (the project module
 | `github.com/prometheus/client_model` | v0.6.3 | Apache-2.0 | LICENSE |
 | `github.com/prometheus/common` | v0.74.0 | Apache-2.0 | LICENSE |
 | `github.com/prometheus/procfs` | v0.23.0 | Apache-2.0 | LICENSE |
-| `go.yaml.in/yaml/v4` | v4.0.0 | Apache-2.0 | LICENSE |
+| `go.yaml.in/yaml/v4` | v4.0.0 | Apache-2.0 AND MIT | LICENSE (Apache-2.0); NOTICE (parts ported from libyaml are MIT-licensed, per the NOTICE file) |
 | `golang.org/x/sys` | v0.49.0 | BSD-3-Clause | LICENSE |
 | `golang.org/x/time` | v0.16.0 | BSD-3-Clause | LICENSE |
 | `google.golang.org/protobuf` | v1.36.12 | BSD-3-Clause | LICENSE |
@@ -123,12 +121,12 @@ Not checked here: whether the Go toolchain's own license notices are reproduced 
 
 What this PR changes, and what was already present before it.
 
-- **Self-update had no tests before this PR.** Commit `4518909` (2026-06-01, "harden self-update, fix security issues") changed `selfupdate.go` and added no test files. `selfupdate_test.go` now covers that path (phase 1), with temp-dir and httptest fixtures and a faked restart hook.
+- **Self-update had no tests before this PR.** Commit `4518909` (2026-06-01, "harden self-update, fix security issues") changed `selfupdate.go` and added no test files. `selfupdate_test.go` now covers that path (this PR), with temp-dir and httptest fixtures and a faked restart hook.
 - **Collectors for local hardware had little coverage.** SMART and sensors tests are new in `collector/local_sources_test.go`.
 - **gosec findings** (5) were triaged in this PR with narrow `#nosec` justifications. None were disabled globally. No finding is left open.
 - **Release builds were not reproducible or attested.** This PR adds `scripts/build-release.sh`, `scripts/check-reproducible.sh`, and attestation on tags. Releases built before it (including v1.14.4) are not reproducible or attested, and their amd64 binary is dynamically linked.
 - **A 15.5 MB binary is in git history** (`7200809`, removed in `92e96d1`). It is not in the current tree. This PR does not rewrite history.
-- **No gofmt check in CI.** `gofmt -l .` was clean locally in phase 1, but no workflow runs it. This is a follow-up.
+- **gofmt is enforced in CI** (ci.yml test job, `Check gofmt` step), so formatting drift is not merged.
 - **Tags are not GPG-signed.** Unchanged by this PR.
 - **Secret scanning, push protection and branch PR rules** are not enabled. These are owner settings, not repository code.
 - **Scorecard and attestation workflows** are added in this PR and have not run yet.
@@ -144,7 +142,7 @@ Repository files and commands behind the statuses:
 - Security documents: `SECURITY.md`, `docs/security/threat-model.md`.
 - Governance: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `GOVERNANCE.md`, `docs/ROADMAP.md`.
 - Dependencies: `go.mod`, `go.sum`, `renovate.json`.
-- Phase 1 checks: `mise run coverage` (88.0%), `golangci-lint run` (0 issues), gosec (0 open), `govulncheck ./...` (no vulnerabilities), `gitleaks git --redact .` (no leaks), `scripts/check-reproducible.sh` (identical checksums).
+- Checks behind these statuses: `mise run coverage` (88.0%), `golangci-lint run` (0 issues), gosec (0 open), `govulncheck ./...` (no vulnerabilities), `gitleaks git --redact .` (no leaks), `scripts/check-reproducible.sh` (identical checksums).
 - GitHub API, verified 2026-11-25: private vulnerability reporting enabled; default-branch ruleset `27497346` (deletion and non-fast-forward rules); security settings as listed in Owner-only actions; Scorecard API 404.
 
 ## Best Practices
@@ -188,13 +186,13 @@ Repository files and commands behind the statuses:
 | `build_floss_tools` | SHOULD | Met | Go, mise, golangci-lint, gosec, govulncheck and gitleaks are FLOSS (mise.toml). | — |
 | `test` | MUST | Met | `go test -race ./...` (mise run test); CI test job in .github/workflows/ci.yml. | — |
 | `test_invocation` | SHOULD | Met | CONTRIBUTING.md 'Local Commands' documents mise run test and the coverage task. | — |
-| `test_most` | SUGGESTED | Met | Statement coverage 88.0% (`mise run coverage`, phase 1 validation); 80% gate enforced. | — |
+| `test_most` | SUGGESTED | Met | Statement coverage 88.4% in CI ([CI run 45650125770](https://github.com/bigtcze/pve-exporter/actions/runs/45650125770), test job, coverage gate 80%). | — |
 | `test_continuous_integration` | SUGGESTED | Met | ci.yml test job runs on pull requests and pushes to main. | — |
 | `test_policy` | MUST | Met | CONTRIBUTING.md 'Testing Policy': new behaviour needs tests; bug fixes need regression tests. | — |
 | `tests_are_added` | MUST | Partial | Fix commit 5d7b9a1 (2026-09-30) added three test files; hardening commit 4518909 (2026-06-01) added none. This PR adds selfupdate_test.go and local_sources_test.go. | Owner: keep requiring tests with fixes. |
 | `tests_documented_added` | SUGGESTED | Met | CONTRIBUTING.md 'Testing Policy' documents when tests are added. | — |
 | `warnings` | MUST | Met | golangci-lint (default linters, includes govet) reports 0 issues; run in CI ci.yml lint step. | — |
-| `warnings_fixed` | MUST | Met | golangci-lint 0 issues (phase 1 validation, 2026-11-25). | — |
+| `warnings_fixed` | MUST | Met | golangci-lint runs with no findings in CI ([CI run 45650125770](https://github.com/bigtcze/pve-exporter/actions/runs/45650125770), test job). | — |
 | `warnings_strict` | SUGGESTED | Partial | Default golangci-lint linter set only; no stricter set and no .golangci config. | Owner (optional): choose a stricter linter set. |
 | `know_secure_design` | MUST | Owner | Evidence for the maintainer's knowledge: docs/security/threat-model.md. The knowledge itself requires maintainer attestation. | Owner: attest secure-design knowledge. |
 | `know_common_errors` | MUST | Owner | Supporting evidence: gosec and golangci-lint in CI; threat-model.md. Knowledge requires maintainer attestation. | Owner: attest common-error knowledge. |
@@ -209,17 +207,17 @@ Repository files and commands behind the statuses:
 | `crypto_random` | MUST | N/A | The project generates no random values or keys (no crypto/rand or math/rand in non-test code). | — |
 | `delivery_mitm` | MUST | Met | Release downloads and self-update use HTTPS to api.github.com and github.com (selfupdate.go). Project URLs use https. | — |
 | `delivery_unsigned` | MUST | Met | Checksums are fetched only over HTTPS from GitHub: the README install and manual-update steps use `https://github.com/bigtcze/pve-exporter/releases/download/...`, and self-update uses `https://api.github.com` and the `browser_download_url` of the release (selfupdate.go). No `http://` URL exists in non-test Go code. Checksums and binary share one channel, so this is transport integrity, not publisher authentication. Releases built after this PR also get GitHub build provenance (release.yml, actions/attest-build-provenance) for publisher authentication; v1.14.4 has no attestation. | Owner: verify the first attested release with `gh attestation verify`. |
-| `vulnerabilities_fixed_60_days` | MUST | Partial | govulncheck reports no known vulnerabilities (phase 1). Time-to-fix for past advisories was not assessed. | Owner: track future advisories against the 60-day target. |
+| `vulnerabilities_fixed_60_days` | MUST | Partial | govulncheck runs in CI and reports no known vulnerabilities ([CI run 45650125770](https://github.com/bigtcze/pve-exporter/actions/runs/45650125770), security job). Time-to-fix for past advisories was not assessed. | Owner: track future advisories against the 60-day target. |
 | `vulnerabilities_critical_fixed` | SHOULD | Partial | No critical vulnerabilities found by govulncheck now; critical-fix history was not assessed. | — |
-| `no_leaked_credentials` | MUST | Met | gitleaks git --redact . reports no leaks (133 commits, phase 1). ci.yml security job runs it. config.yml is gitignored. | Owner: enable GitHub secret scanning and push protection (not verified as enabled). |
-| `static_analysis` | MUST | Met | gosec ./..., golangci-lint and govulncheck run in CI (ci.yml test and security jobs). | — |
+| `no_leaked_credentials` | MUST | Met | gitleaks git --redact . runs in the CI security job and reports no leaks ([CI run 45650125770](https://github.com/bigtcze/pve-exporter/actions/runs/45650125770)). config.yml is gitignored. | Owner: enable GitHub secret scanning and push protection (not verified as enabled). |
+| `static_analysis` | MUST | Met | gosec ./..., golangci-lint and govulncheck run in CI (ci.yml test and security jobs; [CI run 45650125770](https://github.com/bigtcze/pve-exporter/actions/runs/45650125770)). | — |
 | `static_analysis_common_vulnerabilities` | SUGGESTED | Met | gosec covers common Go vulnerability classes; 5 findings triaged with #nosec justifications, 0 open. | — |
 | `static_analysis_fixed` | MUST | Met | gosec reports 0 open findings; each finding was fixed or justified (see Inherited debt section). | — |
 | `static_analysis_often` | SUGGESTED | Met | Static analysis runs on every pull request and push to main, and weekly (ci.yml schedule). | — |
 | `dynamic_analysis` | SUGGESTED | Met | Race detector (`go test -race`) runs in CI test job and mise run test. | — |
-| `dynamic_analysis_unsafe` | SUGGESTED | N/A | No package imports unsafe; release builds use CGO_ENABLED=0 (verified by grep). | — |
+| `dynamic_analysis_unsafe` | SUGGESTED | N/A | No C/C++ code in the repository, cgo is disabled in release builds (CGO_ENABLED=0), and project packages do not import unsafe (some dependencies do). | — |
 | `dynamic_analysis_enable_assertions` | SUGGESTED | Unmet | No assertion-based runtime checks are used; Go has no assert facility. SUGGESTED level. | Owner (optional): decide whether to add assertion-style checks. |
-| `dynamic_analysis_fixed` | MUST | Met | Race-detector runs are clean (phase 1: go test -race ./... passed); findings must be fixed before merge in CI. | — |
+| `dynamic_analysis_fixed` | MUST | Met | The race detector runs in CI test job; the run passed ([CI run 45650125770](https://github.com/bigtcze/pve-exporter/actions/runs/45650125770)). | — |
 
 ### Silver criteria (55)
 
@@ -237,7 +235,7 @@ Repository files and commands behind the statuses:
 | `documentation_architecture` | MUST | Met | AGENTS.md and .agents/ARCHITECTURE.md (tracked in git) describe components and data flow. | — |
 | `documentation_security` | MUST | Met | SECURITY.md, docs/security/threat-model.md, README 'Security' section (added in this PR). | — |
 | `documentation_quick_start` | MUST | Met | README 'Systemd Installation' is the quick-start path. | — |
-| `documentation_current` | MUST | Met | README updated in this PR; build, repro and install commands verified in phase 1. | — |
+| `documentation_current` | MUST | Met | README is updated in this PR; the build and install commands in it are the ones used by scripts/build-release.sh and the release workflow. | — |
 | `documentation_achievements` | MUST | Partial | Scorecard badge added to README; it renders only after scorecard.yml runs on main after merge. Best Practices badge not added (not registered). | Owner: add the Best Practices badge only after registration. |
 | `accessibility_best_practices` | SHOULD | N/A | The only user-facing UI is a minimal informational HTML page with text links; no accessibility assessment applies to this scope. | — |
 | `internationalization` | SHOULD | N/A | English-only; no translatable user interface. | — |
@@ -247,11 +245,11 @@ Repository files and commands behind the statuses:
 | `vulnerability_report_credit` | MUST | Met | SECURITY.md commits to credit reporters unless they decline. No past reports are verified. | — |
 | `vulnerability_response_process` | MUST | Met | SECURITY.md 'What to Expect' describes acknowledgement, triage, fix and coordinated disclosure. | — |
 | `coding_standards` | MUST | Met | CONTRIBUTING.md 'Coding Standards' (gofmt, Effective Go, Go Code Review Comments). | — |
-| `coding_standards_enforced` | MUST | Partial | golangci-lint runs in CI. gofmt is documented but no CI step runs `gofmt -l` (ci.yml has no gofmt step). Local `gofmt -l .` was clean in phase 1. | Follow-up: add a gofmt check to ci.yml (not done in this PR). |
+| `coding_standards_enforced` | MUST | Met | ci.yml test job runs `gofmt -l .` and fails on any unformatted file (step 'Check gofmt'); golangci-lint runs in the same job. Tools are pinned in mise.toml. | — |
 | `build_standard_variables` | MUST | N/A | Go build via `go build` and mise; no autotools-style build variables apply. Release build variables (CGO_ENABLED, GOOS, GOARCH, GOARM) are documented in scripts/build-release.sh. | — |
 | `build_preserve_debug` | SHOULD | Partial | Release binaries are built with -s -w (symbols stripped) by design. Local `go build` keeps debug info. | Owner: decide whether release builds should keep debug info. |
 | `build_non_recursive` | MUST | Met | Makefile and mise tasks invoke go and scripts directly; none recurse into themselves. | — |
-| `build_repeatable` | MUST | Met | scripts/check-reproducible.sh builds from two clones and compares checksums (identical, phase 1); ci.yml reproducible-build job. | — |
+| `build_repeatable` | MUST | Met | scripts/check-reproducible.sh builds from two clones and compares checksums; the ci.yml reproducible-build job runs it ([CI run 45650125770](https://github.com/bigtcze/pve-exporter/actions/runs/45650125770)). | — |
 | `installation_common` | MUST | Met | README 'Systemd Installation' with release binaries and a systemd unit. | — |
 | `installation_standard_variables` | MUST | N/A | Single binary installed to a documented path (/usr/local/bin/pve-exporter); no configurable install prefix is provided. | — |
 | `installation_development_quick` | MUST | Met | CONTRIBUTING.md 'Local Commands': mise install and mise run verify. | — |
@@ -259,9 +257,9 @@ Repository files and commands behind the statuses:
 | `dependency_monitoring` | MUST | Met | Renovate monitors Go modules and GitHub Actions (renovate.json); ci.yml runs govulncheck weekly. | — |
 | `updateable_reused_components` | MUST | Met | Renovate updates dependencies (commits 2587a6f, 2537425, 84e3cab on main); modules pinned in go.mod. | — |
 | `interfaces_current` | SHOULD | Met | go.mod targets Go 1.27.4 and Renovate tracks the Go version (renovate.json packageRules). | — |
-| `automated_integration_testing` | MUST | Partial | Integration-style tests use httptest servers and fixtures. No automated test runs against a live Proxmox host (AGENTS.md forbids live hosts in tests). | Owner: decide whether a live PVE test environment is wanted. |
+| `automated_integration_testing` | MUST | Met | Criterion (bp-en.yml): an automated test suite MUST be applied on each check-in to a shared repository and MUST report success or failure. CI runs the suite on every pull request and push to main and reports results ([CI run 45650125770](https://github.com/bigtcze/pve-exporter/actions/runs/45650125770), test job). | — |
 | `regression_tests_added50` | MUST | Partial | Proxy measure from commit subjects, not a full bug inventory: of three fix-type commits since 2026-05-25 (9c51a86, 5d7b9a1, 4518909), one added tests (5d7b9a1). 4518909 (self-update hardening) added none; this PR adds self-update regression tests. | Owner: keep requiring regression tests for bug fixes. |
-| `test_statement_coverage80` | MUST | Met | Total statement coverage 88.0% (mise run coverage, phase 1); gate at 80%. | — |
+| `test_statement_coverage80` | MUST | Met | Total statement coverage 88.4% in CI ([CI run 45650125770](https://github.com/bigtcze/pve-exporter/actions/runs/45650125770)); gate at 80%. | — |
 | `test_policy_mandated` | MUST | Met | CONTRIBUTING.md 'Testing Policy'; ci.yml enforces the coverage gate. | — |
 | `tests_documented_added` | MUST | Met | CONTRIBUTING.md documents that new behaviour needs tests and bug fixes need regression tests. | — |
 | `warnings_strict` | MUST | Partial | Default golangci-lint set; no stricter warnings set enabled. | Owner (optional): choose a stricter linter set. |
@@ -278,8 +276,8 @@ Repository files and commands behind the statuses:
 | `input_validation` | MUST | Met | Config validation (config/config.go: token ID format, auth required); normalizeAPIHost and buildAPIURL reject invalid hosts and paths; apiPathf escapes segments (collector/api_path.go). | — |
 | `hardening` | SHOULD | Met | Release builds use CGO_ENABLED=0, -trimpath, -buildvcs=false; HTTP server timeouts (main.go); bounded responses and downloads; systemd example in README uses ProtectSystem=strict and a dedicated user. | — |
 | `assurance_case` | MUST | Met | docs/security/threat-model.md is the assurance case, with trust boundaries, mitigations and residual risks. | — |
-| `static_analysis_common_vulnerabilities` | MUST | Met | gosec in CI covers common Go vulnerability classes; findings triaged. | — |
-| `dynamic_analysis_unsafe` | MUST | N/A | No package imports unsafe; no C code; CGO_ENABLED=0 for release builds. | — |
+| `static_analysis_common_vulnerabilities` | MUST | Met | gosec in CI covers common Go vulnerability classes; findings are triaged with #nosec justifications. | — |
+| `dynamic_analysis_unsafe` | MUST | N/A | No C/C++ code in the repository, cgo is disabled in release builds (CGO_ENABLED=0), and project packages do not import unsafe (some dependencies do). | — |
 
 ## OpenSSF Baseline Level 1 (25 IDs)
 

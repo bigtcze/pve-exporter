@@ -504,6 +504,34 @@ func TestGetExecutablePathResolves(t *testing.T) {
 	}
 }
 
+func TestResolveExecutablePathFollowsSymlink(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "pve-exporter-real")
+	must(t, os.WriteFile(target, []byte("bin"), 0o755))
+	link := filepath.Join(dir, "pve-exporter")
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	got, err := resolveExecutablePath(link)
+	if err != nil {
+		t.Fatalf("resolveExecutablePath: %v", err)
+	}
+	wantTarget, err := filepath.EvalSymlinks(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != wantTarget {
+		t.Fatalf("resolved %q, want symlink target %q", got, wantTarget)
+	}
+}
+
+func TestResolveExecutablePathMissingFile(t *testing.T) {
+	if _, err := resolveExecutablePath(filepath.Join(t.TempDir(), "absent")); err == nil {
+		t.Fatal("expected error for missing executable path")
+	}
+}
+
 // selfUpdateFixture prepares a release server and a temp "executable" that
 // must never be replaced by the real test binary.
 type selfUpdateFixture struct {
